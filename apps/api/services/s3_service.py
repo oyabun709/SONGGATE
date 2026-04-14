@@ -29,7 +29,7 @@ from fastapi import HTTPException, status
 
 from config import settings
 
-_PRESIGN_EXPIRES = 3600  # seconds
+PRESIGN_EXPIRES = 3600  # seconds
 
 FOLDER_BY_TYPE: dict[str, str] = {
     "ddex_package": "package",
@@ -110,7 +110,7 @@ def generate_presigned_put(object_key: str, content_type: str) -> str:
                 "Key": object_key,
                 "ContentType": content_type,
             },
-            ExpiresIn=_PRESIGN_EXPIRES,
+            ExpiresIn=PRESIGN_EXPIRES,
         )
         return url
     except (BotoCoreError, ClientError) as exc:

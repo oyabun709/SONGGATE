@@ -1,21 +1,40 @@
 """
-Rules engine — evaluates a list of Rule objects against an artifact payload.
+Rules engine — evaluates Rule objects against an artifact payload.
 
-Supported rule_type values:
-  - xpath    : evaluate an XPath expression against an XML/HTML artifact
-  - regex    : match a regular expression against raw artifact text
-  - semver   : assert the artifact version satisfies a semver constraint
-  - json_path: evaluate a JSONPath expression against a JSON artifact
+The engine uses a registry of handler functions keyed by rule_id (or
+rule_id prefix).  Each handler receives the Rule row and an EvalContext
+and returns a Finding.
+
+Adding a new rule implementation:
+
+    from rules.engine import register, EvalContext, Finding
+    from models.rule import Rule
+
+    @register("universal.audio.sample_rate_minimum")
+    def check_sample_rate(rule: Rule, ctx: EvalContext) -> Finding:
+        # ctx.metadata holds parsed audio metadata dict
+        rate = ctx.metadata.get("sample_rate", 0)
+        passed = rate >= 44100
+        return Finding(
+            rule_id=rule.id,
+            rule_name=rule.title,
+            passed=passed,
+            detail=f"sample rate: {rate} Hz",
+        )
+
+If no handler is registered for a rule_id the engine records a
+'not_implemented' finding (status = warn) rather than crashing.
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
-from lxml import etree
+from models.rule import Rule
 
+
+# ─── finding ─────────────────────────────────────────────────────────────────
 
 @dataclass
 class Finding:
@@ -23,23 +42,30 @@ class Finding:
     rule_name: str
     passed: bool
     detail: str = ""
+    severity: str = "info"          # propagated from the Rule row
 
+
+# ─── eval context ─────────────────────────────────────────────────────────────
 
 @dataclass
 class EvalContext:
-    """Holds parsed representations of the artifact so rules don't re-parse."""
-
+    """
+    Pre-parsed representations of the artifact.  Populated by build_context();
+    individual handlers read only the fields they need.
+    """
     raw: bytes = b""
     text: str = ""
-    xml_tree: Any = None
-    json_data: Any = None
+    xml_tree: Any = None            # lxml ElementTree, or None
+    json_data: Any = None           # parsed JSON object, or None
+    metadata: dict = field(default_factory=dict)  # audio/image metadata
 
 
 def build_context(content: bytes) -> EvalContext:
     ctx = EvalContext(raw=content, text=content.decode("utf-8", errors="replace"))
     try:
+        from lxml import etree
         ctx.xml_tree = etree.fromstring(content)
-    except etree.XMLSyntaxError:
+    except Exception:
         pass
     try:
         import json
@@ -49,58 +75,67 @@ def build_context(content: bytes) -> EvalContext:
     return ctx
 
 
-def evaluate_rule(rule: Any, ctx: EvalContext) -> Finding:
+# ─── handler registry ─────────────────────────────────────────────────────────
+
+_HandlerFn = Callable[["Rule", EvalContext], Finding]
+_REGISTRY: dict[str, _HandlerFn] = {}
+
+
+def register(rule_id: str) -> Callable[[_HandlerFn], _HandlerFn]:
+    """Decorator: register a handler for a specific rule_id."""
+    def decorator(fn: _HandlerFn) -> _HandlerFn:
+        _REGISTRY[rule_id] = fn
+        return fn
+    return decorator
+
+
+def _find_handler(rule_id: str) -> _HandlerFn | None:
+    """Exact match, then longest-prefix match."""
+    if rule_id in _REGISTRY:
+        return _REGISTRY[rule_id]
+    # Prefix match: 'universal.audio' would match 'universal.audio.sample_rate_minimum'
+    best: tuple[int, _HandlerFn | None] = (0, None)
+    for key, fn in _REGISTRY.items():
+        if rule_id.startswith(key) and len(key) > best[0]:
+            best = (len(key), fn)
+    return best[1]
+
+
+# ─── public API ───────────────────────────────────────────────────────────────
+
+def evaluate_rule(rule: Rule, ctx: EvalContext) -> Finding:
+    """
+    Evaluate a single rule against ctx.
+
+    Never raises — unregistered rules return a not_implemented finding,
+    handler exceptions are caught and returned as error findings.
+    """
+    handler = _find_handler(rule.id)
+
+    if handler is None:
+        return Finding(
+            rule_id=rule.id,
+            rule_name=rule.title,
+            passed=False,
+            severity=rule.severity,
+            detail="rule handler not yet implemented",
+        )
+
     try:
-        if rule.rule_type == "regex":
-            passed = bool(re.search(rule.expression, ctx.text))
-            detail = "pattern matched" if passed else "pattern not found"
-        elif rule.rule_type == "xpath":
-            if ctx.xml_tree is None:
-                return Finding(rule.id, rule.name, False, "artifact is not valid XML")
-            result = ctx.xml_tree.xpath(rule.expression)
-            passed = bool(result)
-            detail = f"xpath returned {len(result)} node(s)" if passed else "no nodes matched"
-        elif rule.rule_type == "semver":
-            # Lightweight semver constraint check — replace with `packaging` if needed
-            passed = _check_semver(ctx.text.strip(), rule.expression)
-            detail = "version satisfies constraint" if passed else "version does not satisfy constraint"
-        elif rule.rule_type == "json_path":
-            import jsonpath_ng.ext as jp  # optional dep — add to requirements if used
-            expr = jp.parse(rule.expression)
-            matches = expr.find(ctx.json_data or {})
-            passed = bool(matches)
-            detail = f"jsonpath returned {len(matches)} match(es)" if passed else "no matches"
-        else:
-            return Finding(rule.id, rule.name, False, f"unknown rule_type: {rule.rule_type}")
+        finding = handler(rule, ctx)
+        finding.severity = rule.severity   # always use the DB value
+        return finding
     except Exception as exc:
-        return Finding(rule.id, rule.name, False, f"evaluation error: {exc}")
+        return Finding(
+            rule_id=rule.id,
+            rule_name=rule.title,
+            passed=False,
+            severity=rule.severity,
+            detail=f"evaluation error: {exc}",
+        )
 
-    return Finding(rule.id, rule.name, passed, detail)
 
-
-def run_all(rules: list, content: bytes) -> list[Finding]:
+def run_all(rules: list[Rule], content: bytes) -> list[Finding]:
+    """Run all active rules and return one Finding per rule."""
     ctx = build_context(content)
-    return [evaluate_rule(r, ctx) for r in rules if r.enabled]
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _check_semver(version_str: str, constraint: str) -> bool:
-    """
-    Minimal semver range check.  Supports operators: >=, <=, >, <, ==, !=
-    Example constraint: ">=1.2.0"
-    """
-    import operator as op_module
-    ops = {">=": op_module.ge, "<=": op_module.le, ">": op_module.gt,
-           "<": op_module.lt, "==": op_module.eq, "!=": op_module.ne}
-    for sym, fn in ops.items():
-        if constraint.startswith(sym):
-            target = constraint[len(sym):].strip()
-            return fn(_parse_ver(version_str), _parse_ver(target))
-    return version_str == constraint
-
-
-def _parse_ver(v: str) -> tuple[int, ...]:
-    return tuple(int(x) for x in v.lstrip("v").split(".")[:3])
+    return [evaluate_rule(r, ctx) for r in rules if r.active]

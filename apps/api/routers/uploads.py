@@ -27,7 +27,7 @@ from schemas.upload import (
     PresignResponse,
 )
 from services.s3_service import (
-    _PRESIGN_EXPIRES,
+    PRESIGN_EXPIRES,
     build_object_key,
     generate_presigned_put,
     s3_public_url,
@@ -80,7 +80,7 @@ async def presign_upload(
     return PresignResponse(
         upload_url=upload_url,
         object_key=object_key,
-        expires_in=_PRESIGN_EXPIRES,
+        expires_in=PRESIGN_EXPIRES,
     )
 
 

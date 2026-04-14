@@ -3,28 +3,43 @@ from pydantic import BaseModel
 
 
 class RuleCreate(BaseModel):
-    name: str
+    id: str                          # e.g. 'spotify.metadata.publisher_required'
+    layer: str
+    dsp: str | None = None
+    title: str
     description: str | None = None
-    rule_type: str
-    expression: str
-    enabled: bool = True
+    severity: str                    # critical / warning / info
+    category: str
+    fix_hint: str | None = None
+    doc_url: str | None = None
+    active: bool = True
+    version: str = "1.0.0"
 
 
 class RuleUpdate(BaseModel):
-    name: str | None = None
+    title: str | None = None
     description: str | None = None
-    expression: str | None = None
-    enabled: bool | None = None
+    severity: str | None = None
+    category: str | None = None
+    fix_hint: str | None = None
+    doc_url: str | None = None
+    active: bool | None = None
+    version: str | None = None
 
 
 class RuleRead(BaseModel):
     model_config = {"from_attributes": True}
 
     id: str
-    name: str
+    layer: str
+    dsp: str | None
+    title: str
     description: str | None
-    rule_type: str
-    expression: str
-    enabled: bool
+    severity: str
+    category: str
+    fix_hint: str | None
+    doc_url: str | None
+    active: bool
+    version: str
     created_at: datetime
     updated_at: datetime
