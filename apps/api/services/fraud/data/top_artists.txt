@@ -1,0 +1,167 @@
+# Known artist name list for impersonation detection.
+# One name per line. Case-insensitive during comparison.
+# Source: public charts + editorial databases.
+# Expand to 10 000+ by loading from Chartmetric API or MusicBrainz dump.
+ABBA
+AC/DC
+Adele
+Aerosmith
+Amy Winehouse
+Arcade Fire
+Arctic Monkeys
+Ariana Grande
+Avicii
+Bad Bunny
+Beethoven
+Beyonce
+Billie Eilish
+Black Sabbath
+Bob Dylan
+Bob Marley
+Bon Jovi
+Bruno Mars
+Britney Spears
+Calvin Harris
+Cardi B
+Chris Brown
+Coldplay
+Daft Punk
+David Bowie
+Doja Cat
+Dolly Parton
+Drake
+Dua Lipa
+Ed Sheeran
+Elton John
+Eminem
+Foo Fighters
+Frank Ocean
+Frank Sinatra
+Green Day
+Guns N Roses
+Harry Styles
+Ice Cube
+Jack Johnson
+Jay-Z
+Jimi Hendrix
+John Legend
+John Lennon
+Johnny Cash
+Jonas Brothers
+Justin Bieber
+Justin Timberlake
+Kanye West
+Katy Perry
+Kendrick Lamar
+Lady Gaga
+Led Zeppelin
+Lil Wayne
+Lizzo
+Lorde
+Macklemore
+Madonna
+Mariah Carey
+Mark Ronson
+Maroon 5
+Metallica
+Michael Jackson
+Miguel
+Muse
+Nas
+Nirvana
+Nicki Minaj
+Olivia Rodrigo
+Ozzy Osbourne
+Paul McCartney
+Pearl Jam
+Pharrell Williams
+Pink Floyd
+Post Malone
+Prince
+Queen
+Radiohead
+Red Hot Chili Peppers
+Rihanna
+Rolling Stones
+Sam Smith
+Selena Gomez
+Shawn Mendes
+Sia
+SZA
+Stevie Wonder
+Stormzy
+Taylor Swift
+The Beatles
+The Weeknd
+Travis Scott
+Twenty One Pilots
+Tyler the Creator
+U2
+Usher
+Van Halen
+Weezer
+Ye
+Young Thug
+# ── Electronic / Dance ────────────────────────────────────────────────────────
+Above & Beyond
+Aphex Twin
+Chemical Brothers
+Deadmau5
+Disclosure
+DJ Shadow
+Eric Prydz
+Fatboy Slim
+Flume
+Gorillaz
+Hardwell
+Marshmello
+Martin Garrix
+Moby
+Pendulum
+Skrillex
+Tiësto
+Underworld
+# ── Classical / Film ─────────────────────────────────────────────────────────
+Bach
+Brahms
+Chopin
+Debussy
+Handel
+Hans Zimmer
+John Williams
+Mozart
+Schubert
+Tchaikovsky
+Vivaldi
+# ── Latin ─────────────────────────────────────────────────────────────────────
+Bad Bunny
+J Balvin
+Maluma
+Ozuna
+Ricky Martin
+Shakira
+# ── K-Pop / J-Pop ─────────────────────────────────────────────────────────────
+BTS
+Blackpink
+Exo
+Red Velvet
+Twice
+Stray Kids
+NewJeans
+# ── Country ───────────────────────────────────────────────────────────────────
+Blake Shelton
+Carrie Underwood
+Chris Stapleton
+Garth Brooks
+Luke Bryan
+Morgan Wallen
+Willie Nelson
+# ── R&B / Soul ────────────────────────────────────────────────────────────────
+Alicia Keys
+D'Angelo
+Erykah Badu
+H.E.R.
+Janelle Monae
+Maxwell
+Solange
+Toni Braxton

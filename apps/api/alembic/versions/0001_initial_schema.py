@@ -52,22 +52,36 @@ GROUP BY r.id, r.layer, r.dsp, r.severity, r.category, r.title, r.active;
 
 def upgrade() -> None:
     # ── Enum types ────────────────────────────────────────────────────────────
-    op.execute("CREATE TYPE org_tier AS ENUM ('starter', 'pro', 'enterprise')")
-    op.execute(
-        "CREATE TYPE submission_format AS ENUM "
-        "('DDEX_ERN_43', 'DDEX_ERN_42', 'CSV', 'JSON')"
-    )
-    op.execute(
-        "CREATE TYPE release_status AS ENUM "
-        "('pending', 'ingesting', 'ready', 'scanning', 'complete', 'failed')"
-    )
-    op.execute(
-        "CREATE TYPE scan_status AS ENUM ('queued', 'running', 'complete', 'failed')"
-    )
-    op.execute("CREATE TYPE scan_grade AS ENUM ('PASS', 'WARN', 'FAIL')")
-    op.execute(
-        "CREATE TYPE result_status AS ENUM ('fail', 'warn', 'pass')"
-    )
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE org_tier AS ENUM ('starter', 'pro', 'enterprise');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE submission_format AS ENUM ('DDEX_ERN_43', 'DDEX_ERN_42', 'CSV', 'JSON');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE release_status AS ENUM ('pending', 'ingesting', 'ready', 'scanning', 'complete', 'failed');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE scan_status AS ENUM ('queued', 'running', 'complete', 'failed');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE scan_grade AS ENUM ('PASS', 'WARN', 'FAIL');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE result_status AS ENUM ('fail', 'warn', 'pass');
+        EXCEPTION WHEN duplicate_object THEN NULL; END $$
+    """)
 
     # ── organizations ─────────────────────────────────────────────────────────
     op.create_table(
@@ -77,7 +91,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String, nullable=False),
         sa.Column(
             "tier",
-            sa.Enum("starter", "pro", "enterprise", name="org_tier", create_type=False),
+            postgresql.ENUM("starter", "pro", "enterprise", name="org_tier", create_type=False),
             nullable=False,
             server_default="starter",
         ),
@@ -139,7 +153,7 @@ def upgrade() -> None:
         sa.Column("release_date", sa.Date, nullable=True),
         sa.Column(
             "submission_format",
-            sa.Enum(
+            postgresql.ENUM(
                 "DDEX_ERN_43", "DDEX_ERN_42", "CSV", "JSON",
                 name="submission_format", create_type=False,
             ),
@@ -149,7 +163,7 @@ def upgrade() -> None:
         sa.Column("metadata", postgresql.JSONB, nullable=False, server_default="{}"),
         sa.Column(
             "status",
-            sa.Enum(
+            postgresql.ENUM(
                 "pending", "ingesting", "ready", "scanning", "complete", "failed",
                 name="release_status", create_type=False,
             ),
@@ -213,14 +227,14 @@ def upgrade() -> None:
         ),
         sa.Column(
             "status",
-            sa.Enum("queued", "running", "complete", "failed", name="scan_status", create_type=False),
+            postgresql.ENUM("queued", "running", "complete", "failed", name="scan_status", create_type=False),
             nullable=False,
             server_default="queued",
         ),
         sa.Column("readiness_score", sa.Float, nullable=True),
         sa.Column(
             "grade",
-            sa.Enum("PASS", "WARN", "FAIL", name="scan_grade", create_type=False),
+            postgresql.ENUM("PASS", "WARN", "FAIL", name="scan_grade", create_type=False),
             nullable=True,
         ),
         sa.Column("total_issues", sa.Integer, nullable=False, server_default="0"),
@@ -266,7 +280,7 @@ def upgrade() -> None:
         sa.Column("severity", sa.String, nullable=False),
         sa.Column(
             "status",
-            sa.Enum("fail", "warn", "pass", name="result_status", create_type=False),
+            postgresql.ENUM("fail", "warn", "pass", name="result_status", create_type=False),
             nullable=False,
         ),
         sa.Column("message", sa.String, nullable=False),

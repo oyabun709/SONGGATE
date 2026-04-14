@@ -38,10 +38,19 @@ VALID_LAYERS = {"metadata", "audio", "artwork", "packaging", "fingerprint"}
 
 
 def load_yaml_files() -> list[dict]:
-    """Parse every .yml file in rules/dsp/ and return a flat list of rule dicts."""
-    all_rules: list[dict] = []
+    """
+    Parse every *.yml and *.yaml file in rules/dsp/ and return a flat list
+    of rule dicts, deduplicated by rule id.
 
-    for yaml_file in sorted(RULES_DIR.glob("*.yml")):
+    Loading order: *.yml first, then *.yaml.  When the same rule id appears
+    in both a .yml and a .yaml file the .yaml version wins (it is the
+    authoritative version with check expressions).
+    """
+    seen: dict[str, dict] = {}  # rule_id → rule dict (last write wins)
+
+    all_files = sorted(RULES_DIR.glob("*.yml")) + sorted(RULES_DIR.glob("*.yaml"))
+
+    for yaml_file in all_files:
         with yaml_file.open() as fh:
             doc = yaml.safe_load(fh)
 
@@ -63,9 +72,9 @@ def load_yaml_files() -> list[dict]:
                 "version": entry.get("version", file_version),
             }
             _validate(rule, yaml_file.name)
-            all_rules.append(rule)
+            seen[rule["id"]] = rule
 
-    return all_rules
+    return list(seen.values())
 
 
 def _validate(rule: dict, source: str) -> None:

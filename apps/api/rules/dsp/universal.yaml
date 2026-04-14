@@ -1,0 +1,200 @@
+# Universal rules — applied to every DSP regardless of target platform.
+# These fire whenever the engine is called, regardless of the dsps= list.
+# id convention: universal.<layer>.<slug>
+
+version: "1.0.0"
+dsp: null
+
+rules:
+  # ── Identifiers ─────────────────────────────────────────────────────────────
+  - id: universal.metadata.upc_format
+    layer: metadata
+    title: UPC must be 12 or 13 digits
+    description: The UPC/EAN barcode must consist of exactly 12 or 13 numeric digits.
+    severity: critical
+    category: identifiers
+    check: "regex_match(metadata.upc, '^\\d{12,13}$')"
+    fix_hint: Obtain a valid UPC from your distributor and re-submit.
+    doc_url: null
+    active: true
+
+  - id: universal.metadata.isrc_present
+    layer: metadata
+    title: Every track must have an ISRC
+    description: >
+      Each track in the release must carry an ISRC (International Standard
+      Recording Code).  A missing ISRC will block royalty attribution across
+      all DSPs.
+    severity: critical
+    category: identifiers
+    check: "len(metadata.isrc_list) > 0"
+    fix_hint: Register an ISRC for each track at your national ISRC agency or distributor.
+    doc_url: https://isrc.ifpi.org/
+    active: true
+
+  - id: universal.metadata.isrc_format
+    layer: metadata
+    title: ISRC must follow ISO 3901 format
+    description: >
+      Each track ISRC must match the pattern CC-XXX-YY-NNNNN
+      (country code, registrant, year, designation number).
+    severity: critical
+    category: identifiers
+    check: "all_items_match(metadata.isrc_list, '^[A-Z]{2}-?[A-Z0-9]{3}-?\\d{2}-?\\d{5}$')"
+    fix_hint: "Correct the ISRC to ISO 3901 format, e.g. US-ABC-23-00001."
+    doc_url: https://isrc.ifpi.org/en/isrc-standard/structure
+    active: true
+
+  - id: universal.metadata.isrc_unique
+    layer: metadata
+    title: ISRCs must be unique across tracks
+    description: >
+      Two tracks sharing the same ISRC indicates a data error.  Each
+      sound recording must have its own unique ISRC.
+    severity: critical
+    category: identifiers
+    check: "no_duplicates(metadata.isrc_list)"
+    fix_hint: Assign a distinct ISRC to each track; do not reuse ISRCs.
+    doc_url: https://isrc.ifpi.org/en/isrc-standard/structure
+    active: true
+
+  # ── Basic metadata ───────────────────────────────────────────────────────────
+  - id: universal.metadata.release_title_required
+    layer: metadata
+    title: Release title is required
+    description: Every release must have a non-empty title field.
+    severity: critical
+    category: basic_metadata
+    check: "has_value(metadata.title)"
+    fix_hint: Populate the release title in your delivery manifest.
+    doc_url: null
+    active: true
+
+  - id: universal.metadata.artist_name_required
+    layer: metadata
+    title: Artist name is required
+    description: A primary artist name must be present on the release.
+    severity: critical
+    category: basic_metadata
+    check: "has_value(metadata.artist)"
+    fix_hint: Add a primary artist contributor to the release.
+    doc_url: null
+    active: true
+
+  - id: universal.metadata.genre_required
+    layer: metadata
+    title: Primary genre is required
+    description: At least one genre must be specified for the release.
+    severity: warning
+    category: classification
+    check: "has_value(metadata.genre)"
+    fix_hint: Select a primary genre from the platform-supported genre list.
+    doc_url: null
+    active: true
+
+  - id: universal.metadata.label_required
+    layer: metadata
+    title: Label name is required
+    description: >
+      The record label or self-release name must be present in the delivery.
+      Most DSPs require this for rights identification.
+    severity: critical
+    category: basic_metadata
+    check: "has_value(metadata.label)"
+    fix_hint: Add your label name (or artist name for self-releases) to the release metadata.
+    doc_url: null
+    active: true
+
+  - id: universal.metadata.release_date_required
+    layer: metadata
+    title: Release date is required
+    description: A release date must be specified for the submission.
+    severity: critical
+    category: scheduling
+    check: "has_value(metadata.release_date)"
+    fix_hint: Provide a release date in YYYY-MM-DD format.
+    doc_url: null
+    active: true
+
+  - id: universal.metadata.release_date_format
+    layer: metadata
+    title: Release date must be YYYY-MM-DD
+    description: The release date must be a valid ISO 8601 date string.
+    severity: error
+    category: scheduling
+    check: "metadata.release_date == '' or regex_match(metadata.release_date, '^\\d{4}-\\d{2}-\\d{2}$')"
+    fix_hint: Format the release date as YYYY-MM-DD, e.g. 2024-06-01.
+    doc_url: null
+    active: true
+
+  # ── Audio ────────────────────────────────────────────────────────────────────
+  - id: universal.audio.sample_rate_minimum
+    layer: audio
+    title: Audio sample rate must be at least 44100 Hz
+    description: Delivered audio files must have a sample rate of 44.1 kHz or higher.
+    severity: critical
+    category: audio_quality
+    # 0 == not yet measured; treat as skip (pipeline sets correct value after audio is uploaded)
+    check: "metadata.sample_rate == 0 or metadata.sample_rate >= 44100"
+    fix_hint: Re-export your audio at 44100 Hz or 48000 Hz.
+    doc_url: null
+    active: true
+
+  - id: universal.audio.bit_depth_minimum
+    layer: audio
+    title: Bit depth must be at least 16-bit
+    description: Audio files must be encoded at 16-bit or higher bit depth.
+    severity: critical
+    category: audio_quality
+    check: "metadata.bit_depth == 0 or metadata.bit_depth >= 16"
+    fix_hint: Re-export at 16-bit (CD quality) or 24-bit (hi-res).
+    doc_url: null
+    active: true
+
+  # ── Artwork ──────────────────────────────────────────────────────────────────
+  - id: universal.artwork.minimum_resolution
+    layer: artwork
+    title: Artwork must be at least 3000×3000 px
+    description: Release artwork must be at least 3000×3000 pixels to meet all DSP requirements.
+    severity: critical
+    category: artwork
+    # artwork_width == 0 → not uploaded yet → fail (artwork is required)
+    check: "metadata.artwork_width > 0 and metadata.artwork_width >= 3000 and metadata.artwork_height >= 3000"
+    fix_hint: Re-export artwork at 3000×3000 px or higher.
+    doc_url: null
+    active: true
+
+  - id: universal.artwork.must_be_square
+    layer: artwork
+    title: Artwork must be square (1:1 aspect ratio)
+    description: Width and height of the cover art image must be equal.
+    severity: critical
+    category: artwork
+    check: "metadata.artwork_width == 0 or metadata.artwork_width == metadata.artwork_height"
+    fix_hint: Crop or re-export the image to a 1:1 aspect ratio.
+    doc_url: null
+    active: true
+
+  - id: universal.artwork.format_must_be_jpeg_or_png
+    layer: artwork
+    title: Artwork must be JPEG or PNG
+    description: Only JPEG and PNG formats are accepted for cover art.
+    severity: critical
+    category: artwork
+    check: "metadata.artwork_format == '' or metadata.artwork_format in ['jpeg', 'png']"
+    fix_hint: Convert artwork to JPEG (preferred) or PNG.
+    doc_url: null
+    active: true
+
+  - id: universal.artwork.no_text_overlay
+    layer: artwork
+    title: Artwork should not contain explicit pricing or website URLs
+    description: >
+      Artwork containing URLs, prices, or promotional text is typically
+      rejected by DSPs.
+    severity: warning
+    category: artwork
+    check: null
+    fix_hint: Remove URLs, prices, and promotional copy from the artwork.
+    doc_url: null
+    active: true

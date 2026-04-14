@@ -5,7 +5,7 @@ celery_app = Celery(
     "ropqa",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["tasks.pipeline_tasks"],
+    include=["tasks.pipeline_tasks", "tasks.audio_analysis", "tasks.generate_report"],
 )
 
 celery_app.conf.update(

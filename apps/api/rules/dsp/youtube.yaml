@@ -1,0 +1,156 @@
+# YouTube Music / Content ID specific QA rules.
+# YouTube ingestion happens via DDEX ERN or direct CMS upload.
+# id convention: youtube.<layer>.<slug>
+
+version: "1.0.0"
+dsp: youtube
+
+rules:
+  # ── Metadata ─────────────────────────────────────────────────────────────────
+  - id: youtube.metadata.isrc_required_for_content_id
+    layer: metadata
+    title: ISRC is required for YouTube Content ID matching
+    description: >
+      YouTube's Content ID system uses the ISRC to match user-uploaded videos
+      against the reference audio.  Missing ISRCs will prevent Content ID
+      from claiming and monetizing matching content.
+    severity: critical
+    category: identifiers
+    check: "len(metadata.isrc_list) > 0"
+    fix_hint: Register an ISRC for each track before YouTube delivery.
+    doc_url: https://support.google.com/youtube/answer/6367649
+    active: true
+
+  - id: youtube.metadata.content_advisory_required
+    layer: metadata
+    title: Age restriction / parental advisory must be declared
+    description: >
+      YouTube requires creators and distributors to declare whether content
+      is suitable for all ages or restricted.  Provide a parental warning
+      value so the CMS can apply the correct age gate.
+    severity: critical
+    category: content_advisory
+    check: "has_value(metadata.parental_warning)"
+    fix_hint: "Set the parental warning to 'Explicit', 'NotExplicit', or 'Clean'."
+    doc_url: null
+    active: true
+
+  - id: youtube.metadata.upc_required
+    layer: metadata
+    title: UPC/EAN is required for YouTube Music release matching
+    description: >
+      YouTube Music uses the UPC to match album deliveries to existing
+      YouTube videos.  A missing or invalid UPC will prevent proper linking.
+    severity: critical
+    category: identifiers
+    check: "has_value(metadata.upc) and regex_match(metadata.upc, '^\\d{12,13}$')"
+    fix_hint: Provide a valid 12- or 13-digit UPC.
+    doc_url: null
+    active: true
+
+  - id: youtube.metadata.language_code_valid
+    layer: metadata
+    title: Language code must be a valid ISO 639-1 code
+    description: >
+      YouTube's ingestion pipeline requires a valid ISO 639-1 language code
+      for metadata localisation and search ranking.
+    severity: warning
+    category: localization
+    check: "metadata.language == '' or regex_match(metadata.language, '^[a-z]{2}$')"
+    fix_hint: Use a two-letter ISO 639-1 language code (e.g. "en", "es", "fr").
+    doc_url: null
+    active: true
+
+  - id: youtube.metadata.genre_required
+    layer: metadata
+    title: Genre improves YouTube Music discoverability
+    description: >
+      Providing a genre helps YouTube Music's recommendation engine surface
+      the release to relevant audiences.
+    severity: warning
+    category: classification
+    check: "has_value(metadata.genre)"
+    fix_hint: Select a primary genre for the release.
+    doc_url: null
+    active: true
+
+  - id: youtube.metadata.label_required
+    layer: metadata
+    title: Label / rights holder name is required for Content ID
+    description: >
+      The Content ID asset requires a rights holder name.  Missing this
+      field will prevent claim management in YouTube Studio.
+    severity: critical
+    category: basic_metadata
+    check: "has_value(metadata.label)"
+    fix_hint: Provide the label or rights-holder name in the release metadata.
+    doc_url: null
+    active: true
+
+  # ── Audio ─────────────────────────────────────────────────────────────────────
+  - id: youtube.audio.preferred_sample_rate
+    layer: audio
+    title: Preferred sample rate is 44100 Hz or 48000 Hz
+    description: >
+      YouTube's audio processing pipeline prefers 44100 Hz or 48000 Hz.
+      Other rates are accepted but may introduce resampling artifacts.
+    severity: info
+    category: audio_quality
+    check: "metadata.sample_rate == 0 or metadata.sample_rate in [44100, 48000]"
+    fix_hint: Re-export at 44100 Hz or 48000 Hz.
+    doc_url: null
+    active: true
+
+  - id: youtube.audio.loudness_target
+    layer: audio
+    title: Integrated loudness should target −14 LUFS
+    description: >
+      YouTube normalizes audio to −14 LUFS.  Delivering significantly louder
+      or quieter content will result in level adjustment that may degrade
+      the listening experience.
+    severity: info
+    category: loudness
+    check: "metadata.loudness_lufs == 0.0 or (metadata.loudness_lufs >= -16.0 and metadata.loudness_lufs <= -12.0)"
+    fix_hint: Re-master targeting −14 LUFS integrated loudness.
+    doc_url: null
+    active: true
+
+  # ── Artwork ──────────────────────────────────────────────────────────────────
+  - id: youtube.artwork.minimum_resolution
+    layer: artwork
+    title: Artwork must be at least 3000×3000 px for YouTube Music
+    description: >
+      YouTube Music displays cover art at high resolution.  Images below
+      3000×3000 px will appear blurry on high-DPI screens.
+    severity: critical
+    category: artwork
+    check: "metadata.artwork_width > 0 and metadata.artwork_width >= 3000 and metadata.artwork_height >= 3000"
+    fix_hint: Re-export artwork at 3000×3000 px or higher.
+    doc_url: null
+    active: true
+
+  - id: youtube.artwork.rgb_color_space
+    layer: artwork
+    title: Artwork must be in RGB colour space
+    description: >
+      YouTube processes artwork in RGB.  CMYK images will be converted
+      automatically but colours may shift unexpectedly.
+    severity: warning
+    category: artwork
+    check: "metadata.artwork_color_mode == '' or metadata.artwork_color_mode == 'RGB'"
+    fix_hint: Convert artwork to RGB/sRGB before delivery.
+    doc_url: null
+    active: true
+
+  - id: youtube.artwork.format_jpeg_preferred
+    layer: artwork
+    title: JPEG is the preferred artwork format for YouTube
+    description: >
+      While YouTube Music accepts both JPEG and PNG, JPEG is preferred for
+      photographs and complex artwork as it produces smaller file sizes.
+    severity: info
+    category: artwork
+    check: "metadata.artwork_format == '' or metadata.artwork_format in ['jpeg', 'png']"
+    fix_hint: Deliver cover art as a JPEG for optimal file size.
+    doc_url: null
+    active: true

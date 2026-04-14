@@ -1,0 +1,176 @@
+# Spotify-specific QA rules.
+# id convention: spotify.<layer>.<slug>
+
+version: "1.0.0"
+dsp: spotify
+
+rules:
+  # ── Metadata ─────────────────────────────────────────────────────────────────
+  - id: spotify.metadata.contributor_publisher_required
+    layer: metadata
+    title: Publisher (rights holder) contributor is required
+    description: >
+      Spotify requires at least one publisher to be listed as a contributor
+      on every release.  Missing publisher data blocks royalty distribution.
+    severity: critical
+    category: contributors
+    check: "has_value(metadata.publisher)"
+    fix_hint: Add a publisher contributor with a valid IPI/CAE number.
+    doc_url: https://artists.spotify.com/en/help/article/delivery-spec
+    active: true
+
+  - id: spotify.metadata.explicit_content_flag
+    layer: metadata
+    title: Explicit content advisory must be declared
+    description: >
+      Releases containing explicit lyrics must be flagged with the Explicit
+      content advisory.  Omitting the flag for explicit content can result
+      in removal.  All releases must declare a parental warning status.
+    severity: critical
+    category: content_advisory
+    check: "has_value(metadata.parental_warning)"
+    fix_hint: "Set the parental_warning field to 'Explicit', 'NotExplicit', or 'Clean'."
+    doc_url: https://artists.spotify.com/en/help/article/explicit-content
+    active: true
+
+  - id: spotify.metadata.explicit_flag_valid_value
+    layer: metadata
+    title: Explicit content flag must be a recognised value
+    description: >
+      The parental warning value must be one of: Explicit, NotExplicit, or Clean.
+      Any other value will be rejected by Spotify's ingestion system.
+    severity: critical
+    category: content_advisory
+    check: "metadata.parental_warning == '' or metadata.parental_warning in ['Explicit', 'NotExplicit', 'Clean']"
+    fix_hint: "Use exactly 'Explicit', 'NotExplicit', or 'Clean' as the parental warning value."
+    doc_url: https://artists.spotify.com/en/help/article/explicit-content
+    active: true
+
+  - id: spotify.metadata.p_line_year_required
+    layer: metadata
+    title: P-line (sound recording copyright) year is required
+    description: A ℗ year must be present on every release delivered to Spotify.
+    severity: critical
+    category: rights
+    check: "has_value(metadata.p_line)"
+    fix_hint: Add the year of first publication in the P-line field.
+    doc_url: null
+    active: true
+
+  - id: spotify.metadata.c_line_required
+    layer: metadata
+    title: C-line (copyright notice) is required
+    description: A © copyright line must accompany every Spotify delivery.
+    severity: critical
+    category: rights
+    check: "has_value(metadata.c_line)"
+    fix_hint: Add the copyright holder and year in the C-line field.
+    doc_url: null
+    active: true
+
+  - id: spotify.metadata.label_name_required
+    layer: metadata
+    title: Label name is required
+    description: The record label name must be provided in the release metadata.
+    severity: critical
+    category: basic_metadata
+    check: "has_value(metadata.label)"
+    fix_hint: Add your label name to the release metadata.
+    doc_url: null
+    active: true
+
+  - id: spotify.metadata.language_code_valid
+    layer: metadata
+    title: Language code must be a valid ISO 639-1 code
+    description: >
+      The metadata language field must be a two-letter ISO 639-1 code
+      (e.g. "en", "fr", "es").
+    severity: warning
+    category: localization
+    check: "metadata.language == '' or regex_match(metadata.language, '^[a-z]{2}$')"
+    fix_hint: Replace the language value with a valid ISO 639-1 code.
+    doc_url: null
+    active: true
+
+  - id: spotify.metadata.track_title_no_version_in_main
+    layer: metadata
+    title: Version info should not appear in the main track title
+    description: >
+      Spotify guidelines recommend placing version strings like "(feat. X)",
+      "(Radio Edit)", or "(Live)" in the subtitle/version field rather than
+      the main track title.
+    severity: warning
+    category: titling
+    # Check that the title does not contain common version markers
+    check: "not contains(metadata.title, '(feat.') and not contains(metadata.title, '(Radio Edit)') and not contains(metadata.title, '(Live)') and not contains(metadata.title, '(Remix)')"
+    fix_hint: Move version info from the track title into the subtitle/version field.
+    doc_url: null
+    active: true
+
+  # ── Audio ─────────────────────────────────────────────────────────────────────
+  - id: spotify.audio.preferred_sample_rate
+    layer: audio
+    title: Preferred sample rate is 44100 Hz or 48000 Hz
+    description: >
+      While Spotify accepts 44100–192000 Hz, the preferred delivery rate is
+      44100 Hz or 48000 Hz to avoid unnecessary resampling artifacts.
+    severity: info
+    category: audio_quality
+    check: "metadata.sample_rate == 0 or metadata.sample_rate in [44100, 48000]"
+    fix_hint: Re-export at 44100 Hz or 48000 Hz for optimal quality.
+    doc_url: https://artists.spotify.com/en/help/article/audio-file-formats
+    active: true
+
+  - id: spotify.audio.true_peak_limit
+    layer: audio
+    title: True peak level must not exceed −1 dBTP
+    description: >
+      Audio must be limited to −1 dBTP true peak to prevent clipping
+      during Spotify's encoding pipeline.
+    severity: critical
+    category: loudness
+    # true_peak_dbtp == 0.0 means not measured (skip); otherwise must be ≤ −1.0
+    check: "metadata.true_peak_dbtp == 0.0 or metadata.true_peak_dbtp <= -1.0"
+    fix_hint: Apply true-peak limiting to −1 dBTP before delivery.
+    doc_url: https://artists.spotify.com/en/help/article/loudness-normalization
+    active: true
+
+  - id: spotify.audio.loudness_target
+    layer: audio
+    title: Integrated loudness should target −14 LUFS
+    description: >
+      Spotify normalizes to −14 LUFS.  Delivering significantly louder will
+      result in volume attenuation; quieter masters will be boosted.
+      Target −14 LUFS ±2 LUFS for the best listener experience.
+    severity: info
+    category: loudness
+    check: "metadata.loudness_lufs == 0.0 or (metadata.loudness_lufs >= -16.0 and metadata.loudness_lufs <= -12.0)"
+    fix_hint: Re-master targeting −14 LUFS integrated loudness.
+    doc_url: https://artists.spotify.com/en/help/article/loudness-normalization
+    active: true
+
+  # ── Artwork ──────────────────────────────────────────────────────────────────
+  - id: spotify.artwork.preferred_resolution
+    layer: artwork
+    title: Preferred artwork resolution is 3000×3000 px
+    description: >
+      Spotify recommends 3000×3000 px cover art.  The minimum accepted is
+      640×640 px, but higher resolution is strongly preferred.
+    severity: warning
+    category: artwork
+    check: "metadata.artwork_width == 0 or metadata.artwork_width >= 3000"
+    fix_hint: Deliver artwork at exactly 3000×3000 px JPEG.
+    doc_url: null
+    active: true
+
+  - id: spotify.artwork.no_spotify_logo
+    layer: artwork
+    title: Artwork must not contain Spotify branding
+    description: >
+      Spotify prohibits the use of its name, logo, or branding in cover art.
+    severity: critical
+    category: artwork
+    check: null
+    fix_hint: Remove all Spotify logos, wordmarks, and branding from the artwork.
+    doc_url: null
+    active: true

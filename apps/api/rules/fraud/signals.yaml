@@ -1,0 +1,148 @@
+# Fraud signal definitions.
+# These are loaded at FraudScreener startup and drive all signal metadata.
+# The 'check' field is intentionally absent — fraud logic is in Python, not YAML expressions.
+# All signals are ADVISORY unless advisory: false.
+
+version: "1.0.0"
+
+signals:
+
+  # ── Functional music / spam ───────────────────────────────────────────────────
+  - id: fraud.functional_music_spam
+    name: Functional Music Spam Pattern
+    category: spam
+    severity: warning
+    advisory: true
+    description: >
+      Multiple indicators suggest this release may be part of a functional music
+      spam operation: keyword-heavy titles, uniform track lengths, and/or high
+      track count with formulaic naming are common markers of low-quality bulk
+      releases that DSPs routinely remove.
+    resolution: >
+      If this is a legitimate ambient/wellness release, provide: (1) proof of
+      original composition (publisher registration, ISWC), (2) artist bio and
+      prior release history, (3) label letterhead confirming the release program.
+      Advisory only — submission is not automatically blocked.
+
+  - id: fraud.all_tracks_same_duration
+    name: All Tracks Identical Duration
+    category: ai_content
+    severity: warning
+    advisory: true
+    description: >
+      All tracks in this release have an identical or near-identical duration
+      (within ±2 seconds). Human recordings rarely share exact durations across
+      multiple tracks; this pattern is strongly associated with AI-generated or
+      looped audio submitted as individual tracks.
+    resolution: >
+      If tracks are legitimately the same duration (DJ set chapters, audiobook
+      segments, sample packs), provide documentation confirming the format.
+      Advisory only — submission is not automatically blocked.
+
+  # ── Artist name impersonation ─────────────────────────────────────────────────
+  - id: fraud.artist_name_similarity
+    name: Artist Name Closely Resembles a Known Artist
+    category: impersonation
+    severity: critical
+    advisory: false
+    description: >
+      The submitted artist name is very close (Levenshtein distance ≤ 2) to a
+      known, established artist. This pattern is frequently used to siphon streams
+      from popular artists via algorithmic misattribution and is a DSP policy
+      violation.
+    resolution: >
+      If your artist name legitimately resembles another artist's name, submit
+      a support ticket with: (1) proof of prior commercial use of the name (earlier
+      releases, trademark registration, press coverage), (2) a legal statement
+      confirming no intent to impersonate. Releases are held pending review.
+
+  - id: fraud.homoglyph_artist_name
+    name: Unicode Homoglyph Characters Detected in Artist Name
+    category: impersonation
+    severity: critical
+    advisory: false
+    description: >
+      The artist name contains Unicode characters that visually resemble standard
+      ASCII letters but are from a different script (e.g. Cyrillic 'а' in place of
+      Latin 'a'). This technique is used to create artist names that look identical
+      to famous artists in most UIs while bypassing exact-match filters.
+    resolution: >
+      Replace homoglyph characters with their standard ASCII equivalents.
+      If your artist name legitimately uses non-Latin script, submit documentation
+      confirming it is your registered performing name.
+
+  # ── Release velocity ──────────────────────────────────────────────────────────
+  - id: fraud.high_release_velocity_artist
+    name: Unusually High Release Velocity (Artist)
+    category: spam
+    severity: warning
+    advisory: true
+    description: >
+      This artist name has been associated with more than 5 releases in the past
+      30 days. While high-volume artists exist, this pattern is frequently
+      associated with content farms that bulk-submit generic releases to collect
+      streaming royalties at scale.
+    resolution: >
+      High-volume legitimate artists (remix compilations, classical catalogue,
+      audiobook series) should pre-register their release program with the platform
+      to suppress future velocity flags.
+
+  - id: fraud.high_release_velocity_org
+    name: Unusually High Release Velocity (Organization)
+    category: spam
+    severity: warning
+    advisory: true
+    description: >
+      This organization has submitted more than 20 releases in the past 7 days.
+      While large distributors regularly operate at this scale, a spike in velocity
+      from a previously low-volume account warrants review.
+    resolution: >
+      Organizations experiencing legitimate volume spikes (catalogue migration,
+      label acquisition) should contact support to whitelist the submission period.
+
+  # ── Title quality ─────────────────────────────────────────────────────────────
+  - id: fraud.generic_track_titles
+    name: Generic or Placeholder Track Titles
+    category: quality
+    severity: info
+    advisory: true
+    description: >
+      One or more tracks have generic or placeholder titles (e.g. "Track 1",
+      "Untitled", "Demo", "New Song"). These are frequently seen in bulk low-quality
+      submissions and may indicate metadata was not properly completed before delivery.
+    resolution: >
+      Replace all placeholder titles with the actual track titles. Releases with
+      generic titles are at higher risk of removal by DSP editorial teams.
+
+  # ── AI content ────────────────────────────────────────────────────────────────
+  - id: fraud.ai_generation_suspected
+    name: AI-Generated Content Indicators
+    category: ai_content
+    severity: warning
+    advisory: true
+    description: >
+      Multiple indicators suggest this release may contain AI-generated audio:
+      missing composer/lyricist credits, publisher names associated with AI music
+      tools, formulaic track naming patterns, and/or missing ISWC. DSPs including
+      Spotify and Apple Music have policies requiring disclosure of AI-generated
+      content.
+    resolution: >
+      If content is AI-generated, disclose this per DSP AI content policies.
+      If content is human-composed, provide: (1) composer/lyricist credits with
+      IPI/CAE numbers, (2) ISWC if registered, (3) publisher name and contact.
+
+  # ── Duplicate content ─────────────────────────────────────────────────────────
+  - id: fraud.duplicate_isrc
+    name: ISRC Previously Used for Different Content
+    category: duplicate
+    severity: critical
+    advisory: false
+    description: >
+      One or more ISRCs in this release have previously been associated with a
+      different sound recording in the ropqa corpus. Each ISRC must uniquely
+      identify a single sound recording. Reusing ISRCs across different recordings
+      corrupts rights attribution and royalty distribution.
+    resolution: >
+      Obtain new ISRCs for any tracks that reuse an existing ISRC. Contact your
+      national ISRC agency or distributor. This flag is not advisory — the
+      conflicting ISRCs must be resolved before delivery can proceed.

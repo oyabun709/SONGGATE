@@ -9,6 +9,8 @@ import {
   GitBranch,
   ShieldCheck,
   BarChart3,
+  TrendingUp,
+  CreditCard,
   Settings,
   Zap,
   Building2,
@@ -20,7 +22,9 @@ const navItems = [
   { href: "/releases", label: "Releases", icon: Package },
   { href: "/pipelines", label: "Pipelines", icon: GitBranch },
   { href: "/rules", label: "Rules", icon: ShieldCheck },
+  { href: "/analytics", label: "Analytics", icon: TrendingUp, badge: "Corpus" },
   { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/billing", label: "Billing", icon: CreditCard },
 ];
 
 export function Sidebar() {
@@ -49,7 +53,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {navItems.map(({ href, label, icon: Icon }) => (
+        {navItems.map(({ href, label, icon: Icon, badge }) => (
           <Link
             key={href}
             href={href}
@@ -61,7 +65,12 @@ export function Sidebar() {
             )}
           >
             <Icon className="h-4 w-4 shrink-0" />
-            {label}
+            <span className="flex-1">{label}</span>
+            {badge && (
+              <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 leading-none">
+                {badge}
+              </span>
+            )}
           </Link>
         ))}
       </nav>

@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  RopQA Demo Release — ERN 4.3 with Intentional Errors
+  =====================================================
+  This file is used in the RopQA onboarding demo to showcase what
+  the scanner catches. It contains 4 intentional errors:
+
+  ERROR 1 (metadata layer): Track 2 is missing the MusicPublisher contributor.
+           Rule: DDEX_PUBLISHER_REQUIRED — Every SoundRecording must have at
+           least one Contributor with Role=MusicPublisher.
+           Fix: Add a Contributor/MusicPublisher to Track 2.
+
+  ERROR 2 (artwork layer): Cover art is 2000×2000 px.
+           Rule: ART_MIN_RESOLUTION — Artwork must be at least 3000×3000 px
+           for Spotify, Apple Music, and Amazon.
+           Fix: Resize artwork to 3000×3000 or larger.
+
+  ERROR 3 (ddex layer): Track 3 has a malformed ISRC (missing hyphens).
+           Rule: DDEX_ISRC_FORMAT — ISRC must match CC-XXX-YY-NNNNN.
+           Fix: Change USRC11607841X to US-RC1-16-07841.
+
+  ERROR 4 (fraud layer): Track 3 has suspiciously generic lyrics keywords
+           in the title and very short duration (under 60 seconds).
+           Rule: FRAUD_MUSIC_SPAM — Short tracks with generic titles are a
+           known signal for streaming fraud / artificial inflation.
+           Fix: Review track; flag if content is not legitimate.
+-->
+<ern:NewReleaseMessage
+  xmlns:ern="http://ddex.net/xml/ern/43"
+  xmlns:avs="http://ddex.net/xml/avs/avs"
+  MessageSchemaVersionId="ern/43"
+  BusinessProfileVersionId="CommonDDEXStandards/CommonReleaseTypes/14/0"
+  ReleaseProfileVersionId="CommonDDEXStandards/CommonReleaseTypes/14/0/AudioAlbumMusicOnly"
+  LanguageAndScriptCode="en"
+  MessageId="MSG-DEMO-20240115-001">
+
+  <MessageHeader>
+    <MessageThreadId>THREAD-DEMO-20240115-001</MessageThreadId>
+    <MessageId>MSG-DEMO-20240115-001</MessageId>
+    <MessageSender>
+      <PartyId>PADPIDA2014090301U</PartyId>
+      <PartyName>
+        <FullName>Demo Distributor Inc.</FullName>
+      </PartyName>
+    </MessageSender>
+    <MessageRecipient>
+      <PartyId>PADPIDA2014120801U</PartyId>
+      <PartyName>
+        <FullName>Spotify AB</FullName>
+      </PartyName>
+    </MessageRecipient>
+    <MessageCreatedDateTime>2024-01-15T10:00:00</MessageCreatedDateTime>
+    <MessageControlType>LiveMessage</MessageControlType>
+  </MessageHeader>
+
+  <UpdateIndicator>OriginalMessage</UpdateIndicator>
+  <IsBackfill>false</IsBackfill>
+
+  <PartyList>
+    <Party>
+      <PartyReference>P1</PartyReference>
+      <PartyName>
+        <FullName>Nova Crest</FullName>
+        <NamesBeforeKeyName>Nova</NamesBeforeKeyName>
+        <KeyName>Crest</KeyName>
+      </PartyName>
+    </Party>
+    <Party>
+      <PartyReference>P2</PartyReference>
+      <PartyName>
+        <FullName>Aurora Records LLC</FullName>
+      </PartyName>
+      <PartyId>PADPIDA2014090301U</PartyId>
+    </Party>
+    <Party>
+      <PartyReference>P3</PartyReference>
+      <PartyName>
+        <FullName>Aurora Music Publishing</FullName>
+      </PartyName>
+    </Party>
+  </PartyList>
+
+  <ResourceList>
+
+    <!-- Track 1: Clean — no errors -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <Isrc>USRC17607839</Isrc>
+      <ResourceReference>A1</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Midnight Architecture</TitleText>
+      </ReferenceTitle>
+      <Duration>PT3M48S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>Midnight Architecture</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <Contributor SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor SequenceNumber="2">
+          <PartyReference>P1</PartyReference>
+          <Role>Composer</Role>
+        </Contributor>
+        <Contributor SequenceNumber="3">
+          <PartyReference>P3</PartyReference>
+          <Role>MusicPublisher</Role><!-- ✓ Publisher present -->
+        </Contributor>
+        <PLine>
+          <Year>2024</Year>
+          <PLineText>2024 Aurora Records LLC</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2024</Year>
+          <CLineText>2024 Aurora Records LLC</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Indie Pop</GenreText>
+        </Genre>
+        <LanguageOfPerformance>en</LanguageOfPerformance>
+        <IsInstrumental>false</IsInstrumental>
+        <IsExplicit>false</IsExplicit>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Track 2: ERROR 1 — Missing MusicPublisher -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <Isrc>USRC17607840</Isrc>
+      <ResourceReference>A2</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Neon Overflow</TitleText>
+      </ReferenceTitle>
+      <Duration>PT4M12S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>Neon Overflow</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <Contributor SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor SequenceNumber="2">
+          <PartyReference>P1</PartyReference>
+          <Role>Composer</Role>
+        </Contributor>
+        <!-- ✗ ERROR 1: MusicPublisher contributor missing for Track 2 -->
+        <PLine>
+          <Year>2024</Year>
+          <PLineText>2024 Aurora Records LLC</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2024</Year>
+          <CLineText>2024 Aurora Records LLC</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Indie Pop</GenreText>
+        </Genre>
+        <LanguageOfPerformance>en</LanguageOfPerformance>
+        <IsInstrumental>false</IsInstrumental>
+        <IsExplicit>false</IsExplicit>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Track 3: ERROR 3 (bad ISRC) + ERROR 4 (fraud signal) -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <Isrc>USRC11607841X</Isrc><!-- ✗ ERROR 3: malformed ISRC — should be US-RC1-16-07841 -->
+      <ResourceReference>A3</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Relaxing Study Music Background Chill</TitleText><!-- ✗ ERROR 4: spam-pattern title -->
+      </ReferenceTitle>
+      <Duration>PT0M48S</Duration><!-- ✗ ERROR 4: 48 seconds — below 60s spam threshold -->
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>Relaxing Study Music Background Chill</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <Contributor SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor SequenceNumber="2">
+          <PartyReference>P1</PartyReference>
+          <Role>Composer</Role>
+        </Contributor>
+        <Contributor SequenceNumber="3">
+          <PartyReference>P3</PartyReference>
+          <Role>MusicPublisher</Role>
+        </Contributor>
+        <PLine>
+          <Year>2024</Year>
+          <PLineText>2024 Aurora Records LLC</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2024</Year>
+          <CLineText>2024 Aurora Records LLC</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Ambient</GenreText>
+        </Genre>
+        <LanguageOfPerformance>en</LanguageOfPerformance>
+        <IsInstrumental>true</IsInstrumental>
+        <IsExplicit>false</IsExplicit>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Artwork: ERROR 2 — 2000×2000 (below 3000×3000 minimum) -->
+    <Image>
+      <ImageType>FrontCoverImage</ImageType>
+      <ResourceReference>R1</ResourceReference>
+      <TechnicalDetails>
+        <TechnicalResourceDetailsReference>T_R1</TechnicalResourceDetailsReference>
+        <File>
+          <FileName>cover.jpg</FileName>
+          <FilePath>resources/</FilePath>
+        </File>
+        <ImageHeight>2000</ImageHeight><!-- ✗ ERROR 2: 2000px — minimum is 3000px -->
+        <ImageWidth>2000</ImageWidth><!-- ✗ ERROR 2: 2000px — minimum is 3000px -->
+      </TechnicalDetails>
+    </Image>
+
+  </ResourceList>
+
+  <MusicalWorkList>
+    <MusicalWork>
+      <MusicalWorkReference>W1</MusicalWorkReference>
+      <ReferenceTitle>
+        <TitleText>Midnight Architecture</TitleText>
+      </ReferenceTitle>
+    </MusicalWork>
+    <MusicalWork>
+      <MusicalWorkReference>W2</MusicalWorkReference>
+      <ReferenceTitle>
+        <TitleText>Neon Overflow</TitleText>
+      </ReferenceTitle>
+    </MusicalWork>
+    <MusicalWork>
+      <MusicalWorkReference>W3</MusicalWorkReference>
+      <ReferenceTitle>
+        <TitleText>Relaxing Study Music Background Chill</TitleText>
+      </ReferenceTitle>
+    </MusicalWork>
+  </MusicalWorkList>
+
+  <ReleaseList>
+    <Release IsMainRelease="true">
+      <ReleaseReference>R0</ReleaseReference>
+      <ReleaseType>Album</ReleaseType>
+      <ReleaseId>
+        <ICPN IsEAN="true">0123456789012</ICPN>
+      </ReleaseId>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A1</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A2</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A3</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="SecondaryResource">R1</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Nova Crest</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <Title TitleType="FormalTitle">
+          <TitleText>Luminous Decay</TitleText>
+        </Title>
+        <Label>
+          <LabelName>Aurora Records LLC</LabelName>
+        </Label>
+        <Genre>
+          <GenreText>Indie Pop</GenreText>
+        </Genre>
+        <ReleaseDate>2024-03-01</ReleaseDate>
+        <OriginalReleaseDate>2024-03-01</OriginalReleaseDate>
+        <PLine>
+          <Year>2024</Year>
+          <PLineText>2024 Aurora Records LLC</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2024</Year>
+          <CLineText>2024 Aurora Records LLC</CLineText>
+        </CLine>
+      </ReleaseDetailsByTerritory>
+    </Release>
+  </ReleaseList>
+
+  <DealList>
+    <ReleaseDeal>
+      <DealReleaseReference>R0</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <CommercialModelType>PayAsYouGoModel</CommercialModelType>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+            <UseType>PermanentDownload</UseType>
+          </Usage>
+          <TerritoryCode>Worldwide</TerritoryCode>
+          <ValidityPeriod>
+            <StartDate>2024-03-01</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+    </ReleaseDeal>
+  </DealList>
+
+</ern:NewReleaseMessage>

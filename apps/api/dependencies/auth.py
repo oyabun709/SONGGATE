@@ -168,3 +168,20 @@ async def get_current_org(
             org = result.scalar_one()
 
     return org
+
+
+async def get_current_user_id(
+    authorization: str = Header(..., description="Bearer <clerk_session_token>"),
+) -> str:
+    """Return the Clerk user ID (`sub` claim) from the JWT — no DB lookup."""
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header must be 'Bearer <token>'",
+        )
+    claims = await _verify_clerk_jwt(token)
+    user_id: str | None = claims.get("sub")
+    if not user_id:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="No user ID in token")
+    return user_id

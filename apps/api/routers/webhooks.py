@@ -1,18 +1,25 @@
 """
-Clerk webhook handler.
+Webhook handlers.
 
-Register this endpoint in the Clerk Dashboard under
-  Webhooks → Add Endpoint → https://<your-domain>/webhooks/clerk
+Clerk
+─────
+Register at: Clerk Dashboard → Webhooks → https://<domain>/webhooks/clerk
+Events: organization.created, organization.updated, organization.deleted
+Secret: CLERK_WEBHOOK_SECRET
 
-Events to subscribe to:
-  - organization.created
-  - organization.updated
-  - organization.deleted
-
-Set the signing secret as CLERK_WEBHOOK_SECRET in your environment.
+Stripe
+──────
+Register at: Stripe Dashboard → Developers → Webhooks → https://<domain>/webhooks/stripe
+Events:
+  - checkout.session.completed
+  - customer.subscription.updated
+  - customer.subscription.deleted
+  - invoice.payment_failed
+Secret: STRIPE_WEBHOOK_SECRET
 """
 
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
@@ -132,3 +139,169 @@ async def _handle_org_deleted(data: dict, db: AsyncSession) -> None:
         await db.delete(org)
         await db.commit()
         logger.info("Deleted org %s", clerk_org_id)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stripe webhook
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/stripe", status_code=status.HTTP_200_OK)
+async def stripe_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Handle Stripe events.
+
+    Stripe sends a `Stripe-Signature` header containing a HMAC-SHA256 signature
+    that we verify against STRIPE_WEBHOOK_SECRET before trusting the payload.
+    """
+    raw_body = await request.body()
+    sig_header = request.headers.get("stripe-signature", "")
+
+    if not settings.stripe_webhook_secret:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="STRIPE_WEBHOOK_SECRET is not configured",
+        )
+
+    try:
+        import stripe
+        stripe.api_key = settings.stripe_secret_key
+        event = stripe.Webhook.construct_event(
+            raw_body, sig_header, settings.stripe_webhook_secret
+        )
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid payload")
+    except stripe.SignatureVerificationError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature")
+
+    event_type: str = event["type"]
+    data: dict = event["data"]["object"]
+
+    logger.info("Stripe webhook: %s  id=%s", event_type, event["id"])
+
+    if event_type == "checkout.session.completed":
+        await _stripe_checkout_completed(data, db)
+    elif event_type in ("customer.subscription.updated", "customer.subscription.created"):
+        await _stripe_subscription_updated(data, db)
+    elif event_type == "customer.subscription.deleted":
+        await _stripe_subscription_deleted(data, db)
+    elif event_type == "invoice.payment_failed":
+        await _stripe_payment_failed(data, db)
+    else:
+        logger.debug("Unhandled Stripe event: %s", event_type)
+
+    return {"status": "ok"}
+
+
+async def _get_org_by_stripe_customer(
+    db: AsyncSession, customer_id: str
+) -> Organization | None:
+    return await db.scalar(
+        select(Organization).where(Organization.stripe_customer_id == customer_id)
+    )
+
+
+async def _stripe_checkout_completed(data: dict, db: AsyncSession) -> None:
+    """
+    Fired after a successful Checkout Session.
+    The subscription object is embedded in the session — pull it and sync.
+    """
+    customer_id: str | None = data.get("customer")
+    subscription_id: str | None = data.get("subscription")
+    org_id_meta: str | None = (data.get("metadata") or {}).get("ropqa_org_id")
+
+    # Resolve org
+    org: Organization | None = None
+    if org_id_meta:
+        import uuid
+        try:
+            org = await db.scalar(
+                select(Organization).where(Organization.id == uuid.UUID(org_id_meta))
+            )
+        except Exception:
+            pass
+
+    if org is None and customer_id:
+        org = await _get_org_by_stripe_customer(db, customer_id)
+
+    if org is None:
+        logger.error("checkout.session.completed: could not find org for customer %s", customer_id)
+        return
+
+    # Persist customer ID in case it wasn't set yet
+    if customer_id and not org.stripe_customer_id:
+        org.stripe_customer_id = customer_id
+
+    # Fetch the subscription object from Stripe for full details
+    if subscription_id:
+        import stripe
+        stripe.api_key = settings.stripe_secret_key
+        subscription = stripe.Subscription.retrieve(subscription_id)
+        from services.billing import apply_subscription_to_org
+        apply_subscription_to_org(org, subscription)
+        # Reset scan counter for the new billing period
+        org.scan_count_current_period = 0
+
+    await db.commit()
+    logger.info(
+        "checkout.session.completed: org %s → tier=%s sub=%s",
+        org.id, org.tier, org.stripe_subscription_id,
+    )
+
+
+async def _stripe_subscription_updated(data: dict, db: AsyncSession) -> None:
+    """Sync subscription changes (plan upgrade/downgrade, renewal)."""
+    customer_id: str = data.get("customer", "")
+    org = await _get_org_by_stripe_customer(db, customer_id)
+    if not org:
+        logger.warning("subscription.updated: no org for customer %s", customer_id)
+        return
+
+    from services.billing import apply_subscription_to_org
+    apply_subscription_to_org(org, data)
+
+    # If the billing period rolled over, reset the scan counter
+    if org.current_period_start:
+        # Compare stored period start with what Stripe just sent
+        new_start_ts = data.get("current_period_start")
+        if new_start_ts:
+            new_start = datetime.fromtimestamp(new_start_ts, tz=timezone.utc)
+            stored = org.current_period_start
+            if stored is None or new_start > stored:
+                org.scan_count_current_period = 0
+
+    await db.commit()
+    logger.info(
+        "subscription.updated: org %s tier=%s status=%s",
+        org.id, org.tier, org.stripe_subscription_status,
+    )
+
+
+async def _stripe_subscription_deleted(data: dict, db: AsyncSession) -> None:
+    """Downgrade org to Starter when subscription is canceled."""
+    customer_id: str = data.get("customer", "")
+    org = await _get_org_by_stripe_customer(db, customer_id)
+    if not org:
+        return
+
+    org.stripe_subscription_status = "canceled"
+    org.tier = OrgTier.starter
+    org.stripe_subscription_id = None
+    org.stripe_price_id = None
+    org.stripe_subscription_item_id = None
+    await db.commit()
+    logger.info("subscription.deleted: org %s downgraded to Starter", org.id)
+
+
+async def _stripe_payment_failed(data: dict, db: AsyncSession) -> None:
+    """Mark subscription as past_due — gating middleware will block access."""
+    customer_id: str = data.get("customer", "")
+    org = await _get_org_by_stripe_customer(db, customer_id)
+    if not org:
+        return
+
+    org.stripe_subscription_status = "past_due"
+    await db.commit()
+    logger.warning("invoice.payment_failed: org %s marked past_due", org.id)

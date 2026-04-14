@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from database import Base
+from config import settings
 
 # Import every model so their tables are registered in Base.metadata
 import models.organization   # noqa: F401
@@ -19,6 +20,9 @@ import models.rule           # noqa: F401
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Override alembic.ini sqlalchemy.url with the value from settings (reads env vars)
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 target_metadata = Base.metadata
 

@@ -52,7 +52,7 @@ async def upload_artifact(
     return await ReleaseService(db).attach_artifact(release_id, file)
 
 
-@router.delete("/{release_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{release_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_release(
     release_id: str,
     db: AsyncSession = Depends(get_db),

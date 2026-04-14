@@ -24,6 +24,18 @@ class Settings(BaseSettings):
     clerk_jwks_url: str = ""          # e.g. https://<your-clerk-fapi-host>/.well-known/jwks.json
     clerk_webhook_secret: str = ""    # whsec_... from Clerk dashboard → Webhooks
 
+    # Stripe billing
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""         # whsec_… from Stripe Dashboard → Webhooks
+    stripe_starter_price_id: str = ""       # price_… for $500/month Starter
+    stripe_pro_price_id: str = ""           # price_… for $2,000/month Pro
+    stripe_enterprise_price_id: str = ""    # price_… for $8,000/month Enterprise
+    frontend_url: str = "http://localhost:3000"
+
+    # Email (Resend)
+    resend_api_key: str = ""
+    email_from: str = "noreply@ropqa.com"
+
     # App
     environment: str = "development"
     debug: bool = True

@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  RopQA Sample DDEX ERN 4.3 Template
+  Use this as a starting point for your release packages.
+  Replace all placeholder values (marked with ALL_CAPS) before submission.
+-->
+<ern:NewReleaseMessage
+  xmlns:ern="http://ddex.net/xml/ern/43"
+  xmlns:avs="http://ddex.net/xml/avs/avs"
+  MessageSchemaVersionId="ern/43"
+  BusinessProfileVersionId="CommonDDEXStandards/CommonReleaseTypes/14/0"
+  ReleaseProfileVersionId="CommonDDEXStandards/CommonReleaseTypes/14/0/AudioAlbumMusicOnly"
+  LanguageAndScriptCode="en"
+  MessageId="MSGID_REPLACE_WITH_UUID">
+
+  <MessageHeader>
+    <MessageThreadId>THREAD_REPLACE_WITH_UUID</MessageThreadId>
+    <MessageId>MSGID_REPLACE_WITH_UUID</MessageId>
+    <MessageSender>
+      <PartyId>DPID_YOUR_DPID_HERE</PartyId>
+      <PartyName>
+        <FullName>YOUR COMPANY NAME</FullName>
+      </PartyName>
+    </MessageSender>
+    <MessageRecipient>
+      <PartyId>PADPIDA2014120801U</PartyId><!-- Spotify DPID -->
+      <PartyName>
+        <FullName>Spotify AB</FullName>
+      </PartyName>
+    </MessageRecipient>
+    <MessageCreatedDateTime>2024-01-15T10:00:00</MessageCreatedDateTime>
+    <MessageControlType>LiveMessage</MessageControlType>
+  </MessageHeader>
+
+  <UpdateIndicator>OriginalMessage</UpdateIndicator>
+  <IsBackfill>false</IsBackfill>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- PARTY LIST                                                      -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <PartyList>
+    <!-- Main Artist -->
+    <Party>
+      <PartyReference>P1</PartyReference>
+      <PartyName>
+        <FullName>ARTIST_FULL_NAME</FullName>
+        <NamesBeforeKeyName>ARTIST_FIRST_NAME</NamesBeforeKeyName>
+        <KeyName>ARTIST_LAST_NAME</KeyName>
+      </PartyName>
+      <PartyId IsISNI="true">ISNI_IF_AVAILABLE</PartyId>
+    </Party>
+
+    <!-- Label / Rights Holder -->
+    <Party>
+      <PartyReference>P2</PartyReference>
+      <PartyName>
+        <FullName>YOUR LABEL NAME</FullName>
+      </PartyName>
+      <PartyId>DPID_YOUR_DPID_HERE</PartyId>
+    </Party>
+
+    <!-- Publisher (required for each track) -->
+    <Party>
+      <PartyReference>P3</PartyReference>
+      <PartyName>
+        <FullName>YOUR PUBLISHING COMPANY</FullName>
+      </PartyName>
+    </Party>
+  </PartyList>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- RESOURCE LIST                                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <ResourceList>
+
+    <!-- ─── Track 1 ─────────────────────────────────────────────── -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <Isrc>USRC17607839</Isrc><!-- Replace: CC-XXX-YY-NNNNN format -->
+      <ResourceReference>A1</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>TRACK_1_TITLE</TitleText>
+      </ReferenceTitle>
+      <Duration>PT3M45S</Duration><!-- ISO 8601 duration -->
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>TRACK_1_TITLE</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <Contributor SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor SequenceNumber="2">
+          <PartyReference>P1</PartyReference>
+          <Role>Composer</Role>
+        </Contributor>
+        <Contributor SequenceNumber="3">
+          <PartyReference>P3</PartyReference>
+          <Role>MusicPublisher</Role>
+        </Contributor>
+        <PLine>
+          <Year>2024</Year>
+          <PLineText>2024 YOUR LABEL NAME</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2024</Year>
+          <CLineText>2024 YOUR LABEL NAME</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Pop</GenreText>
+        </Genre>
+        <LanguageOfPerformance>en</LanguageOfPerformance>
+        <IsInstrumental>false</IsInstrumental>
+        <IsExplicit>false</IsExplicit>
+      </SoundRecordingDetailsByTerritory>
+      <ResourceMusicalWorkReference>W1</ResourceMusicalWorkReference>
+    </SoundRecording>
+
+    <!-- ─── Track 2 ─────────────────────────────────────────────── -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <Isrc>USRC17607840</Isrc>
+      <ResourceReference>A2</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>TRACK_2_TITLE</TitleText>
+      </ReferenceTitle>
+      <Duration>PT4M10S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>TRACK_2_TITLE</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <Contributor SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor SequenceNumber="2">
+          <PartyReference>P1</PartyReference>
+          <Role>Composer</Role>
+        </Contributor>
+        <Contributor SequenceNumber="3">
+          <PartyReference>P3</PartyReference>
+          <Role>MusicPublisher</Role>
+        </Contributor>
+        <PLine>
+          <Year>2024</Year>
+          <PLineText>2024 YOUR LABEL NAME</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2024</Year>
+          <CLineText>2024 YOUR LABEL NAME</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Pop</GenreText>
+        </Genre>
+        <LanguageOfPerformance>en</LanguageOfPerformance>
+        <IsInstrumental>false</IsInstrumental>
+        <IsExplicit>false</IsExplicit>
+      </SoundRecordingDetailsByTerritory>
+      <ResourceMusicalWorkReference>W2</ResourceMusicalWorkReference>
+    </SoundRecording>
+
+    <!-- ─── Artwork ───────────────────────────────────────────────
+         Minimum 3000×3000 px, RGB, JPG or PNG, ≤ 100 MB           -->
+    <Image>
+      <ImageType>FrontCoverImage</ImageType>
+      <ResourceReference>R1</ResourceReference>
+      <TechnicalDetails>
+        <TechnicalResourceDetailsReference>T_R1</TechnicalResourceDetailsReference>
+        <File>
+          <FileName>cover.jpg</FileName>
+          <FilePath>resources/</FilePath>
+        </File>
+        <ImageHeight>3000</ImageHeight>
+        <ImageWidth>3000</ImageWidth>
+      </TechnicalDetails>
+    </Image>
+
+  </ResourceList>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- MUSICAL WORK LIST                                               -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <MusicalWorkList>
+    <MusicalWork>
+      <MusicalWorkReference>W1</MusicalWorkReference>
+      <MusicalWorkId IsISWC="true">T-123456789-0</MusicalWorkId><!-- Replace with ISWC if known -->
+      <ReferenceTitle>
+        <TitleText>TRACK_1_TITLE</TitleText>
+      </ReferenceTitle>
+    </MusicalWork>
+    <MusicalWork>
+      <MusicalWorkReference>W2</MusicalWorkReference>
+      <ReferenceTitle>
+        <TitleText>TRACK_2_TITLE</TitleText>
+      </ReferenceTitle>
+    </MusicalWork>
+  </MusicalWorkList>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- RELEASE LIST                                                    -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <ReleaseList>
+    <!-- Album Release -->
+    <Release IsMainRelease="true">
+      <ReleaseReference>R0</ReleaseReference>
+      <ReleaseType>Album</ReleaseType>
+      <ReleaseId>
+        <ICPN IsEAN="true">0123456789012</ICPN><!-- 13-digit UPC/EAN -->
+        <ProprietaryId Namespace="YOUR_NAMESPACE">INTERNAL_ID</ProprietaryId>
+      </ReleaseId>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A1</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A2</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="SecondaryResource">R1</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>ARTIST_FULL_NAME</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <Title TitleType="FormalTitle">
+          <TitleText>ALBUM_TITLE</TitleText>
+        </Title>
+        <Label>
+          <LabelName>YOUR LABEL NAME</LabelName>
+        </Label>
+        <Genre>
+          <GenreText>Pop</GenreText>
+        </Genre>
+        <ReleaseDate>2024-03-01</ReleaseDate>
+        <OriginalReleaseDate>2024-03-01</OriginalReleaseDate>
+        <PLine>
+          <Year>2024</Year>
+          <PLineText>2024 YOUR LABEL NAME</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2024</Year>
+          <CLineText>2024 YOUR LABEL NAME</CLineText>
+        </CLine>
+      </ReleaseDetailsByTerritory>
+    </Release>
+
+    <!-- Track Releases (one per track) -->
+    <Release>
+      <ReleaseReference>R1T</ReleaseReference>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseId>
+        <ISRC>USRC17607839</ISRC>
+      </ReleaseId>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A1</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>ARTIST_FULL_NAME</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <Title TitleType="FormalTitle">
+          <TitleText>TRACK_1_TITLE</TitleText>
+        </Title>
+        <ReleaseDate>2024-03-01</ReleaseDate>
+      </ReleaseDetailsByTerritory>
+    </Release>
+
+    <Release>
+      <ReleaseReference>R2T</ReleaseReference>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseId>
+        <ISRC>USRC17607840</ISRC>
+      </ReleaseId>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A2</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>ARTIST_FULL_NAME</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <Title TitleType="FormalTitle">
+          <TitleText>TRACK_2_TITLE</TitleText>
+        </Title>
+        <ReleaseDate>2024-03-01</ReleaseDate>
+      </ReleaseDetailsByTerritory>
+    </Release>
+  </ReleaseList>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- DEAL LIST                                                       -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <DealList>
+    <ReleaseDeal>
+      <DealReleaseReference>R0</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <CommercialModelType>PayAsYouGoModel</CommercialModelType>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+            <UseType>PermanentDownload</UseType>
+          </Usage>
+          <TerritoryCode>Worldwide</TerritoryCode>
+          <ValidityPeriod>
+            <StartDate>2024-03-01</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+    </ReleaseDeal>
+  </DealList>
+
+</ern:NewReleaseMessage>

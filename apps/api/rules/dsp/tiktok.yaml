@@ -1,0 +1,182 @@
+# TikTok Sound / CapCut specific QA rules.
+# TikTok ingests music for use in short-form video creation.
+# id convention: tiktok.<layer>.<slug>
+
+version: "1.0.0"
+dsp: tiktok
+
+rules:
+  # ── Metadata ─────────────────────────────────────────────────────────────────
+  - id: tiktok.metadata.isrc_required
+    layer: metadata
+    title: ISRC is required for TikTok Sound catalogue
+    description: >
+      TikTok uses the ISRC to uniquely identify sound recordings in the Sound
+      catalogue.  Missing ISRCs will prevent the track from being searchable
+      or licensable on TikTok and CapCut.
+    severity: critical
+    category: identifiers
+    check: "len(metadata.isrc_list) > 0"
+    fix_hint: Register an ISRC for each track before TikTok delivery.
+    doc_url: null
+    active: true
+
+  - id: tiktok.metadata.explicit_flag_required
+    layer: metadata
+    title: Explicit advisory is required
+    description: >
+      TikTok enforces age restrictions on explicit content.  Every release
+      must declare its explicit status to ensure correct content filtering.
+    severity: critical
+    category: content_advisory
+    check: "has_value(metadata.parental_warning)"
+    fix_hint: "Set the parental warning to 'Explicit', 'NotExplicit', or 'Clean'."
+    doc_url: null
+    active: true
+
+  - id: tiktok.metadata.explicit_flag_valid
+    layer: metadata
+    title: Explicit advisory must be a recognised value
+    description: >
+      The parental warning value must be one of: Explicit, NotExplicit, or Clean.
+      TikTok will reject unrecognised values.
+    severity: critical
+    category: content_advisory
+    check: "metadata.parental_warning == '' or metadata.parental_warning in ['Explicit', 'NotExplicit', 'Clean']"
+    fix_hint: "Use exactly 'Explicit', 'NotExplicit', or 'Clean'."
+    doc_url: null
+    active: true
+
+  - id: tiktok.metadata.genre_recommended
+    layer: metadata
+    title: Genre is recommended for TikTok Sound discoverability
+    description: >
+      Providing a genre helps TikTok's algorithm recommend the track to
+      relevant creators and increases playlist placement likelihood.
+    severity: warning
+    category: classification
+    check: "has_value(metadata.genre)"
+    fix_hint: Select a primary genre for TikTok Sound discoverability.
+    doc_url: null
+    active: true
+
+  - id: tiktok.metadata.label_required
+    layer: metadata
+    title: Label / rights holder name is required
+    description: >
+      TikTok requires the label or rights-holder name for licence management
+      and royalty attribution.
+    severity: critical
+    category: basic_metadata
+    check: "has_value(metadata.label)"
+    fix_hint: Provide the label or rights-holder name in the release metadata.
+    doc_url: null
+    active: true
+
+  - id: tiktok.metadata.artist_image_url_recommended
+    layer: metadata
+    title: Artist image URL is recommended for TikTok creator profile
+    description: >
+      Providing an artist image URL allows TikTok to display the artist's
+      photo on the sound page, improving brand recognition for creators.
+    severity: info
+    category: editorial
+    check: null
+    fix_hint: Include a public HTTPS URL to the artist's press photo.
+    doc_url: null
+    active: true
+
+  # ── Audio ─────────────────────────────────────────────────────────────────────
+  - id: tiktok.audio.minimum_duration
+    layer: audio
+    title: Track duration should be at least 30 seconds for licensing
+    description: >
+      TikTok clips are typically 15–60 seconds.  Tracks shorter than 30
+      seconds may not qualify for the full Sound catalogue licence and will
+      not appear in the standard clip picker.
+    severity: warning
+    category: audio_quality
+    check: null
+    fix_hint: Ensure the track is at least 30 seconds long for full TikTok licence eligibility.
+    doc_url: null
+    active: true
+
+  - id: tiktok.audio.preferred_sample_rate
+    layer: audio
+    title: Preferred sample rate is 44100 Hz or 48000 Hz
+    description: >
+      TikTok's audio processing pipeline prefers 44100 Hz or 48000 Hz input.
+      Other rates will be resampled, which can introduce minor quality loss.
+    severity: info
+    category: audio_quality
+    check: "metadata.sample_rate == 0 or metadata.sample_rate in [44100, 48000]"
+    fix_hint: Re-export at 44100 Hz or 48000 Hz.
+    doc_url: null
+    active: true
+
+  - id: tiktok.audio.loudness_target
+    layer: audio
+    title: Integrated loudness should target −14 LUFS for TikTok
+    description: >
+      TikTok normalizes audio to approximately −14 LUFS.  Loud masters will
+      be attenuated; quiet ones boosted.  Targeting −14 LUFS avoids
+      dynamic-range compression artefacts from the normalisation step.
+    severity: info
+    category: loudness
+    check: "metadata.loudness_lufs == 0.0 or (metadata.loudness_lufs >= -16.0 and metadata.loudness_lufs <= -12.0)"
+    fix_hint: Re-master targeting −14 LUFS integrated loudness.
+    doc_url: null
+    active: true
+
+  - id: tiktok.audio.true_peak_limit
+    layer: audio
+    title: True peak must not exceed −1 dBTP
+    description: >
+      TikTok's AAC encoding pipeline requires a −1 dBTP true peak ceiling
+      to prevent clipping after encoding.
+    severity: critical
+    category: loudness
+    check: "metadata.true_peak_dbtp == 0.0 or metadata.true_peak_dbtp <= -1.0"
+    fix_hint: Apply true-peak limiting to −1 dBTP before delivery.
+    doc_url: null
+    active: true
+
+  # ── Artwork ──────────────────────────────────────────────────────────────────
+  - id: tiktok.artwork.minimum_resolution
+    layer: artwork
+    title: Artwork must be at least 3000×3000 px
+    description: >
+      TikTok displays cover art in the Sound picker at up to 3000×3000 px.
+      Lower-resolution artwork will appear blurry on modern screens.
+    severity: critical
+    category: artwork
+    check: "metadata.artwork_width > 0 and metadata.artwork_width >= 3000 and metadata.artwork_height >= 3000"
+    fix_hint: Re-export artwork at 3000×3000 px or higher.
+    doc_url: null
+    active: true
+
+  - id: tiktok.artwork.rgb_color_space
+    layer: artwork
+    title: Artwork must be in RGB colour space
+    description: >
+      TikTok only processes RGB images.  CMYK artwork will not be accepted
+      by TikTok's ingestion pipeline.
+    severity: critical
+    category: artwork
+    check: "metadata.artwork_color_mode == '' or metadata.artwork_color_mode == 'RGB'"
+    fix_hint: Convert artwork to RGB/sRGB colour space before delivery.
+    doc_url: null
+    active: true
+
+  - id: tiktok.artwork.must_be_square
+    layer: artwork
+    title: Artwork must be square (1:1 aspect ratio)
+    description: >
+      TikTok's sound card UI requires square artwork.  Non-square images
+      will be cropped, potentially cutting off important visual elements.
+    severity: critical
+    category: artwork
+    check: "metadata.artwork_width == 0 or metadata.artwork_width == metadata.artwork_height"
+    fix_hint: Crop or re-export the image to a 1:1 aspect ratio.
+    doc_url: null
+    active: true

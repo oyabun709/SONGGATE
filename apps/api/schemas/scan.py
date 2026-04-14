@@ -19,6 +19,8 @@ class ScanRead(BaseModel):
     warning_count: int
     info_count: int
     layers_run: list
+    report_url: str | None = None
+    report_generated_at: datetime | None = None
     started_at: datetime | None
     completed_at: datetime | None
     created_at: datetime

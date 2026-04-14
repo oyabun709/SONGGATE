@@ -43,3 +43,6 @@ coverage/
 
 # Docker
 *.override.yml
+
+# Third-party packages (cloned separately)
+packages/ddex-engine/

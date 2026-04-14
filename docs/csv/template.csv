@@ -1,0 +1,3 @@
+track_number,track_title,artist,isrc,isni,iswc,duration_seconds,genre,language,is_explicit,is_instrumental,publisher,label,p_line_year,p_line_text,c_line_year,c_line_text,upc,release_title,release_date,artwork_filename,artwork_width,artwork_height
+1,Track Title Here,Artist Name,US-ABC-24-00001,,T-123456789-0,225,Pop,en,false,false,Your Publishing Co,Your Label,2024,2024 Your Label,2024,2024 Your Label,0123456789012,Album Title,2024-03-01,cover.jpg,3000,3000
+2,Second Track,Artist Name,US-ABC-24-00002,,,248,Pop,en,false,false,Your Publishing Co,Your Label,2024,2024 Your Label,2024,2024 Your Label,0123456789012,Album Title,2024-03-01,cover.jpg,3000,3000

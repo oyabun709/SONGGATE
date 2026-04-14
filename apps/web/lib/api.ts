@@ -6,7 +6,6 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use(async (config) => {
-  // Clerk token injection happens client-side via useAuth
   return config;
 });
 
@@ -17,3 +16,364 @@ api.interceptors.response.use(
     return Promise.reject(new Error(message));
   }
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ScanStatus = "queued" | "running" | "complete" | "failed";
+export type ScanGrade = "PASS" | "WARN" | "FAIL";
+export type ResultStatus = "fail" | "warn" | "pass";
+export type Severity = "critical" | "warning" | "info";
+export type Layer = "ddex" | "metadata" | "fraud" | "audio" | "artwork" | "enrichment";
+
+export interface Scan {
+  id: string;
+  release_id: string;
+  org_id: string;
+  status: ScanStatus;
+  readiness_score: number | null;
+  grade: ScanGrade | null;
+  total_issues: number;
+  critical_count: number;
+  warning_count: number;
+  info_count: number;
+  layers_run: string[];
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface ScanResult {
+  id: string;
+  scan_id: string;
+  track_id: string | null;
+  layer: Layer;
+  rule_id: string;
+  severity: Severity;
+  status: ResultStatus;
+  message: string;
+  field_path: string | null;
+  actual_value: string | null;
+  expected_value: string | null;
+  fix_hint: string | null;
+  dsp_targets: string[];
+  resolved: boolean;
+  resolution: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  created_at: string;
+}
+
+export interface ScanDetail extends Scan {
+  results: ScanResult[];
+}
+
+export interface Release {
+  id: string;
+  org_id: string;
+  external_id: string | null;
+  title: string;
+  artist: string;
+  upc: string | null;
+  release_date: string | null;
+  submission_format: string;
+  raw_package_url: string | null;
+  status: string;
+  created_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scan API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function createScan(
+  releaseId: string,
+  token: string,
+  opts?: { dsps?: string[]; layers?: string[] }
+): Promise<Scan> {
+  const { data } = await api.post<Scan>(
+    `/releases/${releaseId}/scan`,
+    opts ?? {},
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return data;
+}
+
+export async function getScan(scanId: string, token: string): Promise<Scan> {
+  const { data } = await api.get<Scan>(`/scans/${scanId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function getScanResults(
+  scanId: string,
+  token: string,
+  filters?: { layer?: string; severity?: string; resolved?: boolean }
+): Promise<ScanDetail> {
+  const params = new URLSearchParams();
+  if (filters?.layer) params.set("layer", filters.layer);
+  if (filters?.severity) params.set("severity", filters.severity);
+  if (filters?.resolved !== undefined)
+    params.set("resolved", String(filters.resolved));
+
+  const { data } = await api.get<ScanDetail>(
+    `/scans/${scanId}/results?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return data;
+}
+
+export async function resolveResult(
+  scanId: string,
+  resultId: string,
+  resolution: string,
+  resolvedBy: string,
+  token: string
+): Promise<ScanResult> {
+  const { data } = await api.patch<ScanResult>(
+    `/scans/${scanId}/results/${resultId}/resolve`,
+    { resolution, resolved_by: resolvedBy },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return data;
+}
+
+export interface ReportURLResponse {
+  scan_id: string;
+  report_url: string;
+  report_generated_at: string | null;
+  filename: string;
+}
+
+export async function getScanReport(
+  scanId: string,
+  token: string
+): Promise<ReportURLResponse> {
+  const { data } = await api.get<ReportURLResponse>(`/scans/${scanId}/report`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function regenerateReport(
+  scanId: string,
+  token: string
+): Promise<void> {
+  await api.post(`/scans/${scanId}/report/regenerate`, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function listReleaseScanHistory(
+  releaseId: string,
+  token: string
+): Promise<Scan[]> {
+  const { data } = await api.get<Scan[]>(`/releases/${releaseId}/scans`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Release API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function listReleases(token: string): Promise<Release[]> {
+  const { data } = await api.get<Release[]>("/releases", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function createRelease(
+  payload: {
+    title: string;
+    artist: string;
+    submission_format: string;
+    upc?: string;
+    release_date?: string;
+  },
+  token: string
+): Promise<Release> {
+  const { data } = await api.post<Release>("/releases", payload, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Analytics API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AggregateStats {
+  total_releases_scanned: number;
+  total_issues_found: number;
+  issues_resolved: number;
+  false_positive_rate: number;
+}
+
+export interface TopIssueItem {
+  rule_id: string;
+  rule_label: string;
+  layer: string;
+  severity: string;
+  occurrences: number;
+}
+
+export interface DSPMatrixRow {
+  dsp: string;
+  avg_pass_rate: number;
+  trend: number;
+  total_scans: number;
+  top_failures: string[];
+}
+
+export interface FraudSignalItem {
+  signal: string;
+  rule_id: string;
+  total_flags: number;
+  confirmed: number;
+}
+
+export interface FraudSummary {
+  total_flags_this_month: number;
+  confirmed: number;
+  dismissed: number;
+  confirmation_rate: number;
+  by_type: FraudSignalItem[];
+}
+
+export interface VelocityPoint {
+  week: string;
+  scans: number;
+}
+
+export interface AnalyticsOverview {
+  aggregate: AggregateStats;
+  top_issues: TopIssueItem[];
+  dsp_matrix: DSPMatrixRow[];
+  fraud_signals: FraudSummary;
+  velocity: VelocityPoint[];
+  cached_at: string;
+  cache_ttl_seconds: number;
+  // Present on shared snapshots
+  data_as_of?: string;
+  is_sanitized?: boolean;
+}
+
+export interface ShareTokenOut {
+  token: string;
+  expires_at: string;
+}
+
+export async function getAnalyticsOverview(token: string): Promise<AnalyticsOverview> {
+  const { data } = await api.get<AnalyticsOverview>("/api/v1/analytics/overview", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function refreshAnalyticsOverview(token: string): Promise<AnalyticsOverview> {
+  const { data } = await api.post<AnalyticsOverview>(
+    "/api/v1/analytics/overview/refresh",
+    {},
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return data;
+}
+
+export async function createShareLink(token: string): Promise<ShareTokenOut> {
+  const { data } = await api.post<ShareTokenOut>(
+    "/api/v1/analytics/share",
+    {},
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return data;
+}
+
+export async function getSharedAnalytics(shareToken: string): Promise<AnalyticsOverview> {
+  const { data } = await api.get<AnalyticsOverview>(
+    `/api/v1/analytics/shared/${shareToken}`
+  );
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Billing API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PlanInfo {
+  id: "starter" | "pro" | "enterprise";
+  name: string;
+  price_monthly_usd: number;
+  scan_limit: number;
+  price_id: string | null;
+  features: string[];
+}
+
+export interface Subscription {
+  tier: string;
+  plan_name: string;
+  status: string | null;
+  scan_count: number;
+  scan_limit: number;
+  period_start: string | null;
+  period_end: string | null;
+  is_active: boolean;
+}
+
+export interface Invoice {
+  id: string;
+  number: string | null;
+  status: string;
+  amount_paid_usd: number;
+  currency: string;
+  period_start: string | null;
+  period_end: string | null;
+  invoice_pdf: string | null;
+  hosted_invoice_url: string | null;
+}
+
+export async function getBillingPlans(token: string): Promise<PlanInfo[]> {
+  const { data } = await api.get<PlanInfo[]>("/billing/plans", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function getSubscription(token: string): Promise<Subscription> {
+  const { data } = await api.get<Subscription>("/billing/subscription", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function createCheckoutSession(
+  priceId: string,
+  token: string
+): Promise<{ url: string }> {
+  const { data } = await api.post<{ url: string }>(
+    "/billing/checkout",
+    { price_id: priceId },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return data;
+}
+
+export async function createPortalSession(token: string): Promise<{ url: string }> {
+  const { data } = await api.post<{ url: string }>(
+    "/billing/portal",
+    {},
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return data;
+}
+
+export async function getInvoices(token: string): Promise<Invoice[]> {
+  const { data } = await api.get<Invoice[]>("/billing/invoices", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}

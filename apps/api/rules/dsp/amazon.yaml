@@ -1,0 +1,174 @@
+# Amazon Music HD / Unlimited specific QA rules.
+# Amazon Music HD supports lossless and ultra-HD streaming.
+# id convention: amazon.<layer>.<slug>
+
+version: "1.0.0"
+dsp: amazon
+
+rules:
+  # ── Metadata ─────────────────────────────────────────────────────────────────
+  - id: amazon.metadata.isrc_required
+    layer: metadata
+    title: ISRC is required for Amazon Music
+    description: >
+      Amazon Music uses the ISRC for sound recording identification and
+      royalty attribution.  Every track in the delivery must carry a valid ISRC.
+    severity: critical
+    category: identifiers
+    check: "len(metadata.isrc_list) > 0"
+    fix_hint: Register an ISRC for each track at your national ISRC agency or distributor.
+    doc_url: null
+    active: true
+
+  - id: amazon.metadata.explicit_flag_required
+    layer: metadata
+    title: Explicit / Clean advisory is required
+    description: >
+      Amazon Music requires every release to declare whether it contains
+      explicit lyrics.  Missing this flag can result in family-filter bypass
+      or removal from the service.
+    severity: critical
+    category: content_advisory
+    check: "has_value(metadata.parental_warning)"
+    fix_hint: "Set the parental warning to 'Explicit', 'NotExplicit', or 'Clean'."
+    doc_url: null
+    active: true
+
+  - id: amazon.metadata.explicit_flag_valid
+    layer: metadata
+    title: Explicit advisory must be a recognised value
+    description: >
+      The parental warning value must be one of: Explicit, NotExplicit, or Clean.
+    severity: critical
+    category: content_advisory
+    check: "metadata.parental_warning == '' or metadata.parental_warning in ['Explicit', 'NotExplicit', 'Clean']"
+    fix_hint: "Use exactly 'Explicit', 'NotExplicit', or 'Clean'."
+    doc_url: null
+    active: true
+
+  - id: amazon.metadata.genre_required
+    layer: metadata
+    title: Genre is required for Amazon Music catalogue
+    description: >
+      Amazon Music requires a genre to correctly classify and surface releases
+      in its catalogue.
+    severity: warning
+    category: classification
+    check: "has_value(metadata.genre)"
+    fix_hint: Select a primary genre from the Amazon Music genre list.
+    doc_url: null
+    active: true
+
+  - id: amazon.metadata.label_required
+    layer: metadata
+    title: Label name is required
+    description: Amazon Music requires the label or rights-holder name on every release.
+    severity: critical
+    category: basic_metadata
+    check: "has_value(metadata.label)"
+    fix_hint: Add your label name to the release metadata.
+    doc_url: null
+    active: true
+
+  - id: amazon.metadata.c_line_required
+    layer: metadata
+    title: C-line copyright notice is required
+    description: Amazon Music requires a © copyright notice on every release.
+    severity: critical
+    category: rights
+    check: "has_value(metadata.c_line)"
+    fix_hint: Add the copyright holder and year in the C-line field.
+    doc_url: null
+    active: true
+
+  - id: amazon.metadata.p_line_required
+    layer: metadata
+    title: P-line (sound recording copyright) is required
+    description: Amazon Music requires a ℗ P-line on every release.
+    severity: critical
+    category: rights
+    check: "has_value(metadata.p_line)"
+    fix_hint: Add the year of first publication in the P-line field.
+    doc_url: null
+    active: true
+
+  # ── Audio — HD / Ultra HD ─────────────────────────────────────────────────────
+  - id: amazon.audio.hd_bit_depth
+    layer: audio
+    title: Amazon Music HD requires at least 16-bit audio
+    description: >
+      Amazon Music HD streams at a minimum of 16-bit / 44.1 kHz (HD tier).
+      The Ultra HD tier requires 24-bit audio.  Deliver at least 16-bit for
+      HD eligibility.
+    severity: critical
+    category: audio_quality
+    check: "metadata.bit_depth == 0 or metadata.bit_depth >= 16"
+    fix_hint: Deliver audio at 16-bit minimum; 24-bit preferred for Ultra HD eligibility.
+    doc_url: https://www.amazon.com/music/unlimited/hd
+    active: true
+
+  - id: amazon.audio.ultra_hd_preferred
+    layer: audio
+    title: 24-bit / 96 kHz or higher recommended for Ultra HD tier
+    description: >
+      Amazon Music Ultra HD streams at up to 24-bit / 192 kHz.  Delivering
+      hi-res audio enables the Ultra HD badge and higher streaming royalties.
+    severity: info
+    category: audio_quality
+    check: null
+    fix_hint: Provide a 24-bit / 96 kHz master for Amazon Ultra HD eligibility.
+    doc_url: null
+    active: true
+
+  - id: amazon.audio.true_peak_limit
+    layer: audio
+    title: True peak level must not exceed −1 dBTP
+    description: >
+      Amazon Music requires a true peak ceiling of −1 dBTP to prevent
+      inter-sample clipping during their encoding pipeline.
+    severity: critical
+    category: loudness
+    check: "metadata.true_peak_dbtp == 0.0 or metadata.true_peak_dbtp <= -1.0"
+    fix_hint: Apply true-peak limiting to −1 dBTP before delivery.
+    doc_url: null
+    active: true
+
+  - id: amazon.audio.loudness_target
+    layer: audio
+    title: Integrated loudness should target −14 LUFS
+    description: >
+      Amazon Music normalizes to approximately −14 LUFS.  Delivering outside
+      a ±2 LUFS window around −14 will result in audible level adjustment.
+    severity: info
+    category: loudness
+    check: "metadata.loudness_lufs == 0.0 or (metadata.loudness_lufs >= -16.0 and metadata.loudness_lufs <= -12.0)"
+    fix_hint: Re-master targeting −14 LUFS integrated loudness.
+    doc_url: null
+    active: true
+
+  # ── Artwork ──────────────────────────────────────────────────────────────────
+  - id: amazon.artwork.minimum_resolution
+    layer: artwork
+    title: Artwork must be at least 3000×3000 px
+    description: >
+      Amazon Music displays artwork at up to 3000×3000 px on HD screens.
+      Images below this resolution will appear pixelated.
+    severity: critical
+    category: artwork
+    check: "metadata.artwork_width > 0 and metadata.artwork_width >= 3000 and metadata.artwork_height >= 3000"
+    fix_hint: Re-export artwork at 3000×3000 px or higher.
+    doc_url: null
+    active: true
+
+  - id: amazon.artwork.rgb_color_space
+    layer: artwork
+    title: Artwork must be in RGB colour space
+    description: >
+      Amazon Music processes artwork in RGB colour space.  CMYK images are
+      not accepted and will cause delivery failure.
+    severity: critical
+    category: artwork
+    check: "metadata.artwork_color_mode == '' or metadata.artwork_color_mode == 'RGB'"
+    fix_hint: Convert artwork to RGB/sRGB colour space before delivery.
+    doc_url: null
+    active: true

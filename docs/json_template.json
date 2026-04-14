@@ -1,0 +1,84 @@
+[
+  {
+    "upc": "123456789012",
+    "title": "My Album",
+    "artist": "Artist Name",
+    "label": "My Label LLC",
+    "release_date": "2024-06-01",
+    "release_type": "Album",
+    "genre": "Pop",
+    "parental_warning": "NotExplicit",
+    "c_line": "2024 My Label LLC",
+    "p_line": "2024 My Label LLC",
+    "language": "en",
+    "deals": [
+      {
+        "territory": "Worldwide",
+        "commercial_model": "PayAsYouGoModel",
+        "use_type": "OnDemandStream",
+        "start_date": "2024-06-01"
+      }
+    ],
+    "tracks": [
+      {
+        "isrc": "GB-ABC-24-00001",
+        "title": "Track One",
+        "track_number": 1,
+        "duration_ms": 225000,
+        "composer": "John Composer",
+        "lyricist": "Jane Lyricist",
+        "producer": "Bob Producer",
+        "mix_engineer": "Alice Engineer",
+        "explicit": false,
+        "language": "en"
+      },
+      {
+        "isrc": "GB-ABC-24-00002",
+        "title": "Track Two",
+        "track_number": 2,
+        "duration_ms": 252000,
+        "composer": "John Composer",
+        "lyricist": "Jane Lyricist",
+        "producer": "Bob Producer",
+        "mix_engineer": "Alice Engineer",
+        "explicit": false,
+        "language": "en"
+      }
+    ]
+  },
+  {
+    "upc": "123456789013",
+    "title": "My Single",
+    "artist": "Artist Name",
+    "label": "My Label LLC",
+    "release_date": "2024-07-15",
+    "release_type": "Single",
+    "genre": "Pop",
+    "parental_warning": "NotExplicit",
+    "c_line": "2024 My Label LLC",
+    "p_line": "2024 My Label LLC",
+    "language": "en",
+    "deals": [
+      {
+        "territory": "Worldwide",
+        "commercial_model": "PayAsYouGoModel",
+        "use_type": "OnDemandStream",
+        "start_date": "2024-07-15"
+      }
+    ],
+    "tracks": [
+      {
+        "isrc": "GB-ABC-24-00003",
+        "title": "The Single",
+        "track_number": 1,
+        "duration_ms": 210000,
+        "composer": "John Composer",
+        "lyricist": "Jane Lyricist",
+        "producer": "Bob Producer",
+        "mix_engineer": "Alice Engineer",
+        "explicit": false,
+        "language": "en"
+      }
+    ]
+  }
+]

@@ -2,6 +2,9 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
+  "/",              // marketing landing page
+  "/onboarding(.*)", // self-guided onboarding (unauthenticated demo)
+  "/share(.*)",     // public analytics share links
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks(.*)",
