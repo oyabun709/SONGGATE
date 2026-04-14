@@ -27,6 +27,7 @@ boto3==1.35.68
 # Auth
 python-jose[cryptography]==3.3.0
 httpx-auth==0.23.1
+svix==1.39.0
 
 # Seed / tooling
 pyyaml==6.0.2

@@ -1,9 +1,11 @@
-import { SignIn } from "@clerk/nextjs";
-
-export default function SignInPage() {
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <SignIn />
+      {children}
     </div>
   );
 }

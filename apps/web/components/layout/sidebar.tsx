@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UserButton, useOrganization } from "@clerk/nextjs";
 import {
   LayoutDashboard,
   Package,
@@ -10,6 +11,7 @@ import {
   BarChart3,
   Settings,
   Zap,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,9 +25,11 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { organization } = useOrganization();
 
   return (
     <aside className="flex h-full w-60 flex-col border-r border-slate-200 bg-white">
+      {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-slate-200 px-5">
         <Zap className="h-5 w-5 text-indigo-600" />
         <span className="text-lg font-semibold tracking-tight text-slate-900">
@@ -33,6 +37,17 @@ export function Sidebar() {
         </span>
       </div>
 
+      {/* Org badge */}
+      {organization && (
+        <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-3">
+          <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <span className="truncate text-xs font-medium text-slate-600">
+            {organization.name}
+          </span>
+        </div>
+      )}
+
+      {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {navItems.map(({ href, label, icon: Icon }) => (
           <Link
@@ -51,7 +66,8 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-slate-200 p-3">
+      {/* Footer — settings + user */}
+      <div className="space-y-1 border-t border-slate-200 p-3">
         <Link
           href="/settings"
           className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
@@ -59,6 +75,18 @@ export function Sidebar() {
           <Settings className="h-4 w-4 shrink-0" />
           Settings
         </Link>
+
+        <div className="flex items-center gap-3 rounded-md px-3 py-2">
+          <UserButton
+            afterSignOutUrl="/sign-in"
+            appearance={{
+              elements: {
+                avatarBox: "h-7 w-7",
+              },
+            }}
+          />
+          <span className="text-sm text-slate-600">Account</span>
+        </div>
       </div>
     </aside>
   );

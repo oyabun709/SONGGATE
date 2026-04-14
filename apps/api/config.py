@@ -20,7 +20,8 @@ class Settings(BaseSettings):
 
     # Auth (Clerk)
     clerk_secret_key: str = ""
-    clerk_jwks_url: str = ""
+    clerk_jwks_url: str = ""          # e.g. https://<your-clerk-fapi-host>/.well-known/jwks.json
+    clerk_webhook_secret: str = ""    # whsec_... from Clerk dashboard → Webhooks
 
     # App
     environment: str = "development"

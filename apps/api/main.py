@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import releases, pipelines, rules, reports, health
+from routers import releases, pipelines, rules, reports, health, webhooks
 
 app = FastAPI(
     title="RopQA API",
@@ -17,7 +17,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Public routes
 app.include_router(health.router, tags=["health"])
+app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
+
+# Org-scoped protected routes (all require a valid Clerk JWT with an active org)
 app.include_router(releases.router, prefix="/releases", tags=["releases"])
 app.include_router(pipelines.router, prefix="/pipelines", tags=["pipelines"])
 app.include_router(rules.router, prefix="/rules", tags=["rules"])

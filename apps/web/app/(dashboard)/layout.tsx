@@ -8,8 +8,10 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { userId } = await auth();
+  // Belt-and-suspenders server-side guard (middleware is the primary gate)
+  const { userId, orgId } = await auth();
   if (!userId) redirect("/sign-in");
+  if (!orgId) redirect("/org-selection");
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
