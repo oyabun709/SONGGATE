@@ -347,15 +347,14 @@ export default function LandingPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Zap className="h-3.5 w-3.5 text-indigo-500" />
-              <span>© 2025 SONGGATE</span>
+              <span>© 2026 SONGGATE</span>
             </div>
             <div className="flex items-center gap-6">
               <Link href="/sign-in" className="hover:text-slate-600">
                 Sign in
               </Link>
-              <a href="mailto:support@songgate.io" className="hover:text-slate-600">
-                Support
-              </a>
+              <span>support@songgate.io</span>
+              <span>sales@songgate.io</span>
               <a
                 href="https://api.songgate.io/docs"
                 className="hover:text-slate-600"
@@ -363,9 +362,6 @@ export default function LandingPage() {
                 API docs
               </a>
             </div>
-          </div>
-          <div className="mt-4 text-center text-[10px] uppercase tracking-widest text-slate-300">
-            Powered by HouseLabs, a division of HousesonHills
           </div>
         </div>
       </footer>
