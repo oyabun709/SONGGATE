@@ -136,11 +136,7 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 pb-20 pt-24 text-center">
-        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
-          <Zap className="h-3 w-3" />
-          Trusted by distributors delivering 10,000+ releases/month
-        </div>
-        <h1 className="text-5xl font-bold leading-tight tracking-tight text-slate-900 sm:text-6xl">
+<h1 className="text-5xl font-bold leading-tight tracking-tight text-slate-900 sm:text-6xl">
           Stop releasing with
           <br />
           <span className="text-indigo-600">metadata errors.</span>
