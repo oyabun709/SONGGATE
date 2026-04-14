@@ -179,7 +179,7 @@ export default function LandingPage() {
               <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
               <span className="ml-4 rounded border border-slate-200 bg-white px-3 py-0.5 text-[11px] text-slate-400">
-                app.songgate.io/scans/scan_demo
+                songgate.vercel.app/scans/demo
               </span>
             </div>
             <div className="grid grid-cols-2 divide-x divide-slate-100 p-6">
