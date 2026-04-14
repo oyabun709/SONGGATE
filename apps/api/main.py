@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import releases, pipelines, rules, reports, health, webhooks
+from routers import releases, pipelines, rules, reports, health, webhooks, uploads
 
 app = FastAPI(
     title="RopQA API",
@@ -26,9 +26,9 @@ app.include_router(releases.router, prefix="/releases", tags=["releases"])
 app.include_router(pipelines.router, prefix="/pipelines", tags=["pipelines"])
 app.include_router(rules.router, prefix="/rules", tags=["rules"])
 app.include_router(reports.router, prefix="/reports", tags=["reports"])
+app.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 
 
 @app.on_event("startup")
 async def on_startup() -> None:
-    # DB initialization happens via Alembic migrations
     pass

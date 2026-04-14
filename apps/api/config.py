@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     aws_region: str = "us-east-1"
+    s3_endpoint_url: str = ""         # Set to http://localhost:4566 for LocalStack
 
     # Auth (Clerk)
     clerk_secret_key: str = ""
