@@ -7,7 +7,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "RopQA — Release Ops QA Autopilot",
+  title: "SONGGATE — Release Ops QA Autopilot",
   description:
     "Automated release operations and QA pipeline management. Ingest artifacts, run rule-based validation, and ship with confidence.",
 };

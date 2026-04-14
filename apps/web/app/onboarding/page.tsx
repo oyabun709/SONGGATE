@@ -201,7 +201,7 @@ function StepDemo() {
       <div className="space-y-6">
         <div>
           <h2 className="mb-1 text-2xl font-bold text-slate-900">
-            See RopQA in action
+            See SONGGATE in action
           </h2>
           <p className="text-slate-500">
             We've loaded a sample DDEX ERN 4.3 package that contains 4
@@ -310,7 +310,7 @@ function StepDemo() {
       <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
         <div className="flex items-center gap-2 font-medium">
           <CheckCircle2 className="h-4 w-4" />
-          This is exactly what RopQA catches on your real releases — before
+          This is exactly what SONGGATE catches on your real releases — before
           they hit DSP ingest queues.
         </div>
       </div>
@@ -332,7 +332,7 @@ function StepDSPs({
           Which DSPs do you deliver to?
         </h2>
         <p className="text-slate-500">
-          RopQA tailors validation rules and readiness scores to your target
+          SONGGATE tailors validation rules and readiness scores to your target
           stores. You can change this any time.
         </p>
       </div>
@@ -384,7 +384,7 @@ function StepAccess({ apiKey }: { apiKey: string | null; loading: boolean }) {
           You're all set
         </h2>
         <p className="text-slate-500">
-          Your API key is ready. Use it to integrate RopQA into your pipeline
+          Your API key is ready. Use it to integrate SONGGATE into your pipeline
           or start scanning from the dashboard.
         </p>
       </div>
@@ -434,7 +434,7 @@ function StepAccess({ apiKey }: { apiKey: string | null; loading: boolean }) {
         <ul className="space-y-1 text-indigo-700">
           <li>
             <a
-              href="https://api.ropqa.com/docs"
+              href="https://api.songgate.io/docs"
               className="hover:underline"
               target="_blank"
               rel="noopener noreferrer"
@@ -541,7 +541,7 @@ export default function OnboardingPage() {
         <div className="flex items-center gap-2">
           <Zap className="h-4 w-4 text-indigo-600" />
           <span className="font-semibold tracking-tight text-slate-900">
-            RopQA
+            SONGGATE
           </span>
         </div>
       </div>

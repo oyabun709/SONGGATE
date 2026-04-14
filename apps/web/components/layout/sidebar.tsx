@@ -37,7 +37,7 @@ export function Sidebar() {
       <div className="flex h-16 items-center gap-2 border-b border-slate-200 px-5">
         <Zap className="h-5 w-5 text-indigo-600" />
         <span className="text-lg font-semibold tracking-tight text-slate-900">
-          RopQA
+          SONGGATE
         </span>
       </div>
 

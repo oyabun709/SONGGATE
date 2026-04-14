@@ -138,7 +138,7 @@ export default function SharedAnalyticsPage() {
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
           <div className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-indigo-600" />
-            <span className="text-base font-semibold text-slate-900">RopQA</span>
+            <span className="text-base font-semibold text-slate-900">SONGGATE</span>
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
               Analytics · Read-only
             </span>
@@ -146,12 +146,12 @@ export default function SharedAnalyticsPage() {
           <div className="flex items-center gap-3 text-xs text-slate-400">
             <span>Data as of {new Date(dataAsOf).toLocaleString()}</span>
             <a
-              href="https://ropqa.io"
+              href="https://songgate.io"
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1 font-medium text-indigo-600 hover:text-indigo-700"
             >
-              ropqa.io <ExternalLink className="h-3 w-3" />
+              songgate.io <ExternalLink className="h-3 w-3" />
             </a>
           </div>
         </div>
@@ -401,8 +401,8 @@ export default function SharedAnalyticsPage() {
           <div className="flex items-center justify-center gap-1.5 text-sm text-slate-500">
             <Zap className="h-4 w-4 text-indigo-500" />
             <span>Powered by</span>
-            <a href="https://ropqa.io" target="_blank" rel="noreferrer" className="font-semibold text-indigo-600 hover:text-indigo-700">
-              RopQA
+            <a href="https://songgate.io" target="_blank" rel="noreferrer" className="font-semibold text-indigo-600 hover:text-indigo-700">
+              SONGGATE
             </a>
             <span>— Release Ops QA Autopilot</span>
           </div>

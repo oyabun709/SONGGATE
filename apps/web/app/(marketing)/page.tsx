@@ -93,7 +93,7 @@ const PLANS = [
       "SLA + dedicated support",
     ],
     cta: "Talk to us",
-    href: "mailto:sales@ropqa.com",
+    href: "mailto:sales@songgate.io",
     highlight: false,
   },
 ];
@@ -115,7 +115,7 @@ export default function LandingPage() {
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-indigo-600" />
-            <span className="font-semibold tracking-tight">RopQA</span>
+            <span className="font-semibold tracking-tight">SONGGATE</span>
           </div>
           <div className="flex items-center gap-4">
             <Link
@@ -146,7 +146,7 @@ export default function LandingPage() {
           <span className="text-indigo-600">metadata errors.</span>
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-lg text-slate-500">
-          Pre-flight every release before delivery. RopQA runs 40+ validation
+          Pre-flight every release before delivery. SONGGATE runs 40+ validation
           rules across DDEX structure, metadata, artwork, audio, and fraud
           signals — and scores your readiness for every major DSP.
         </p>
@@ -174,7 +174,7 @@ export default function LandingPage() {
       <section className="bg-slate-50 py-20">
         <div className="mx-auto max-w-4xl px-6">
           <p className="mb-8 text-center text-sm font-medium uppercase tracking-widest text-slate-400">
-            What RopQA catches on a real release
+            What SONGGATE catches on a real release
           </p>
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             {/* Fake browser chrome */}
@@ -183,7 +183,7 @@ export default function LandingPage() {
               <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
               <span className="ml-4 rounded border border-slate-200 bg-white px-3 py-0.5 text-[11px] text-slate-400">
-                app.ropqa.com/scans/scan_demo
+                app.songgate.io/scans/scan_demo
               </span>
             </div>
             <div className="grid grid-cols-2 divide-x divide-slate-100 p-6">
@@ -347,24 +347,29 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t border-slate-100 py-8">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 text-xs text-slate-400">
-          <div className="flex items-center gap-2">
-            <Zap className="h-3.5 w-3.5 text-indigo-500" />
-            <span>© 2024 RopQA</span>
+        <div className="mx-auto max-w-5xl px-6 text-xs text-slate-400">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Zap className="h-3.5 w-3.5 text-indigo-500" />
+              <span>© 2025 SONGGATE</span>
+            </div>
+            <div className="flex items-center gap-6">
+              <Link href="/sign-in" className="hover:text-slate-600">
+                Sign in
+              </Link>
+              <a href="mailto:support@songgate.io" className="hover:text-slate-600">
+                Support
+              </a>
+              <a
+                href="https://api.songgate.io/docs"
+                className="hover:text-slate-600"
+              >
+                API docs
+              </a>
+            </div>
           </div>
-          <div className="flex items-center gap-6">
-            <Link href="/sign-in" className="hover:text-slate-600">
-              Sign in
-            </Link>
-            <a href="mailto:support@ropqa.com" className="hover:text-slate-600">
-              Support
-            </a>
-            <a
-              href="https://api.ropqa.com/docs"
-              className="hover:text-slate-600"
-            >
-              API docs
-            </a>
+          <div className="mt-4 text-center text-[10px] uppercase tracking-widest text-slate-300">
+            Powered by HouseLabs, a division of HousesonHills
           </div>
         </div>
       </footer>
