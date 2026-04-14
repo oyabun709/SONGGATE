@@ -1,0 +1,56 @@
+# TIDAL-specific QA rules.
+# id convention: tidal.<layer>.<slug>
+
+version: "1.0.0"
+dsp: tidal
+
+rules:
+  # ── Audio layer ─────────────────────────────────────────────────────────────
+  - id: tidal.audio.master_quality_preferred
+    layer: audio
+    title: 24-bit / 96 kHz or higher preferred for TIDAL Masters
+    description: >
+      TIDAL Masters (MQA or Hi-Res FLAC) requires 24-bit audio at 96 kHz
+      or higher. Delivering hi-res enables the Masters badge on TIDAL.
+    severity: info
+    category: audio_quality
+    fix_hint: Provide a 24-bit / 96 kHz master for TIDAL Masters eligibility.
+    doc_url: null
+    active: true
+
+  - id: tidal.audio.true_peak_limit
+    layer: audio
+    title: True peak level must not exceed −1 dBTP
+    description: >
+      TIDAL requires a true peak ceiling of −1 dBTP to prevent inter-sample
+      clipping during MQA encoding.
+    severity: critical
+    category: loudness
+    fix_hint: Apply true-peak limiting to −1 dBTP before delivery.
+    doc_url: null
+    active: true
+
+  # ── Metadata layer ──────────────────────────────────────────────────────────
+  - id: tidal.metadata.artist_image_url_optional
+    layer: metadata
+    title: Artist image URL improves editorial placement
+    description: >
+      Supplying a high-resolution artist image URL in the metadata increases
+      the likelihood of editorial and algorithmic playlist inclusion on TIDAL.
+    severity: info
+    category: editorial
+    fix_hint: Include a public HTTPS URL to the artist's press photo (min 2000×2000 px).
+    doc_url: null
+    active: true
+
+  - id: tidal.metadata.isrc_required_for_masters
+    layer: metadata
+    title: ISRC required for TIDAL Masters eligibility
+    description: >
+      Every track submitted for TIDAL Masters must have a valid ISRC.
+      Missing ISRCs will prevent the Masters tier from being activated.
+    severity: critical
+    category: identifiers
+    fix_hint: Register an ISRC for each track before TIDAL Masters delivery.
+    doc_url: null
+    active: true

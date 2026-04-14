@@ -28,6 +28,9 @@ boto3==1.35.68
 python-jose[cryptography]==3.3.0
 httpx-auth==0.23.1
 
+# Seed / tooling
+pyyaml==6.0.2
+
 # Testing
 pytest==8.3.3
 pytest-asyncio==0.24.0

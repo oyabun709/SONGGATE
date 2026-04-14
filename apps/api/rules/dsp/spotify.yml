@@ -1,0 +1,146 @@
+# Spotify-specific QA rules.
+# id convention: spotify.<layer>.<slug>
+
+version: "1.0.0"
+dsp: spotify
+
+rules:
+  # ── Metadata layer ──────────────────────────────────────────────────────────
+  - id: spotify.metadata.contributor_publisher_required
+    layer: metadata
+    title: Publisher contributor is required
+    description: >
+      Spotify requires at least one publisher (rights holder) to be listed
+      as a contributor on every release.
+    severity: critical
+    category: contributors
+    fix_hint: Add a publisher contributor with a valid IPI/CAE number.
+    doc_url: https://artists.spotify.com/en/help/article/delivery-spec
+    active: true
+
+  - id: spotify.metadata.explicit_content_flag
+    layer: metadata
+    title: Explicit content advisory must be declared
+    description: >
+      Releases containing explicit lyrics must be flagged with the Explicit
+      content advisory. Omitting this flag can result in content removal.
+    severity: critical
+    category: content_advisory
+    fix_hint: Set the explicit content flag to 'Explicit' in your metadata.
+    doc_url: https://artists.spotify.com/en/help/article/explicit-content
+    active: true
+
+  - id: spotify.metadata.track_title_no_version_in_main
+    layer: metadata
+    title: Version info should be in subtitle, not main title
+    description: >
+      Spotify guidelines recommend placing version strings like "(feat. X)",
+      "(Radio Edit)", or "(Live)" in the subtitle/version field rather than
+      appending them to the main track title.
+    severity: warning
+    category: titling
+    fix_hint: Move version info from the track title into the subtitle/version field.
+    doc_url: null
+    active: true
+
+  - id: spotify.metadata.p_line_year_required
+    layer: metadata
+    title: P-line (sound recording copyright) year is required
+    description: A ℗ year must be present on every release delivered to Spotify.
+    severity: critical
+    category: rights
+    fix_hint: Add the year of first publication in the P-line field.
+    doc_url: null
+    active: true
+
+  - id: spotify.metadata.c_line_required
+    layer: metadata
+    title: C-line (copyright notice) is required
+    description: A © copyright line must accompany every Spotify delivery.
+    severity: critical
+    category: rights
+    fix_hint: Add the copyright holder and year in the C-line field.
+    doc_url: null
+    active: true
+
+  - id: spotify.metadata.label_name_required
+    layer: metadata
+    title: Label name is required
+    description: The record label name must be provided in the release metadata.
+    severity: critical
+    category: basic_metadata
+    fix_hint: Add your label name to the release metadata.
+    doc_url: null
+    active: true
+
+  - id: spotify.metadata.language_code_valid
+    layer: metadata
+    title: Language code must be a valid ISO 639-1 code
+    description: The metadata language field must be a two-letter ISO 639-1 code (e.g. "en", "fr").
+    severity: warning
+    category: localization
+    fix_hint: Replace the language value with a valid ISO 639-1 code.
+    doc_url: null
+    active: true
+
+  # ── Audio layer ─────────────────────────────────────────────────────────────
+  - id: spotify.audio.preferred_sample_rate
+    layer: audio
+    title: Preferred sample rate is 44100 Hz or 48000 Hz
+    description: >
+      While Spotify accepts 44100–192000 Hz, the preferred delivery rate is
+      44100 Hz or 48000 Hz to avoid unnecessary resampling artifacts.
+    severity: info
+    category: audio_quality
+    fix_hint: Re-export at 44100 Hz or 48000 Hz for optimal quality.
+    doc_url: https://artists.spotify.com/en/help/article/audio-file-formats
+    active: true
+
+  - id: spotify.audio.loudness_target
+    layer: audio
+    title: Integrated loudness should target −14 LUFS
+    description: >
+      Spotify normalizes to −14 LUFS. Mastering significantly louder will
+      result in volume attenuation; quieter masters will be boosted.
+      Target −14 LUFS integrated for best listener experience.
+    severity: info
+    category: loudness
+    fix_hint: Re-master targeting −14 LUFS integrated loudness.
+    doc_url: https://artists.spotify.com/en/help/article/loudness-normalization
+    active: true
+
+  - id: spotify.audio.true_peak_limit
+    layer: audio
+    title: True peak level must not exceed −1 dBTP
+    description: >
+      Audio must be limited to −1 dBTP true peak to prevent clipping
+      during Spotify's encoding pipeline.
+    severity: critical
+    category: loudness
+    fix_hint: Apply true-peak limiting to −1 dBTP before delivery.
+    doc_url: https://artists.spotify.com/en/help/article/loudness-normalization
+    active: true
+
+  # ── Artwork layer ───────────────────────────────────────────────────────────
+  - id: spotify.artwork.preferred_resolution
+    layer: artwork
+    title: Preferred artwork resolution is 3000×3000 px
+    description: >
+      Spotify recommends 3000×3000 px cover art. The minimum accepted is
+      640×640 px, but higher resolution is strongly preferred.
+    severity: warning
+    category: artwork
+    fix_hint: Deliver artwork at exactly 3000×3000 px JPEG.
+    doc_url: null
+    active: true
+
+  - id: spotify.artwork.no_spotify_logo
+    layer: artwork
+    title: Artwork must not contain Spotify branding
+    description: >
+      Spotify prohibits the use of its name, logo, or branding in cover art.
+    severity: critical
+    category: artwork
+    fix_hint: Remove all Spotify logos, wordmarks, and branding from the artwork.
+    doc_url: null
+    active: true

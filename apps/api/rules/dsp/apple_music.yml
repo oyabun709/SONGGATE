@@ -1,0 +1,163 @@
+# Apple Music / iTunes Store specific QA rules.
+# id convention: apple_music.<layer>.<slug>
+
+version: "1.0.0"
+dsp: apple_music
+
+rules:
+  # ── Metadata layer ──────────────────────────────────────────────────────────
+  - id: apple_music.metadata.apple_id_unique
+    layer: metadata
+    title: Apple ID must be unique per track
+    description: >
+      Each track delivered to Apple Music must have a unique Apple ID.
+      Reusing Apple IDs across releases will cause ingestion failure.
+    severity: critical
+    category: identifiers
+    fix_hint: Assign a unique Apple ID to each track.
+    doc_url: https://itunesconnect.apple.com/WebObjects/iTunesConnect.woa/ra/ng/music_delivery
+    active: true
+
+  - id: apple_music.metadata.advisory_rating_required
+    layer: metadata
+    title: Advisory rating (explicit/clean/notExplicit) is required
+    description: >
+      Apple Music requires an advisory rating on every track and release.
+      Valid values are Explicit, Clean, or Not Explicit.
+    severity: critical
+    category: content_advisory
+    fix_hint: Set the advisory rating field to Explicit, Clean, or Not Explicit.
+    doc_url: null
+    active: true
+
+  - id: apple_music.metadata.genre_must_be_apple_genre
+    layer: metadata
+    title: Genre must be from Apple Music's approved genre list
+    description: >
+      Apple Music only accepts genres from its canonical genre tree.
+      Submitting a genre not in the tree will cause delivery failure.
+    severity: critical
+    category: classification
+    fix_hint: Select a genre from the official Apple Music genre list.
+    doc_url: null
+    active: true
+
+  - id: apple_music.metadata.preview_start_time
+    layer: metadata
+    title: Preview start time should be within the first 60 seconds
+    description: >
+      Apple Music generates 30-second previews. The preview start time
+      should be set within the first 60 seconds for optimal presentation.
+    severity: info
+    category: preview
+    fix_hint: Set the preview start time to a musically engaging moment within the first 60 seconds.
+    doc_url: null
+    active: true
+
+  - id: apple_music.metadata.iswc_recommended
+    layer: metadata
+    title: ISWC (composition ID) is recommended
+    description: >
+      Including the International Standard Musical Work Code (ISWC) improves
+      rights matching and royalty attribution on Apple Music.
+    severity: info
+    category: identifiers
+    fix_hint: Obtain the ISWC from your PRO and include it in the composition metadata.
+    doc_url: null
+    active: true
+
+  - id: apple_music.metadata.territory_rights_specified
+    layer: metadata
+    title: Territory rights must be explicitly specified
+    description: >
+      Apple requires territory availability to be declared explicitly.
+      "Worldwide" is acceptable but must be set — omitting territory info
+      will result in the release not appearing on the store.
+    severity: critical
+    category: rights
+    fix_hint: Specify territory availability (worldwide or per-territory) in your delivery.
+    doc_url: null
+    active: true
+
+  - id: apple_music.metadata.preorder_date_before_release_date
+    layer: metadata
+    title: Pre-order date must precede release date
+    description: >
+      If a pre-order date is set, it must be earlier than the release date.
+    severity: critical
+    category: scheduling
+    fix_hint: Set the pre-order date to a date before the release date.
+    doc_url: null
+    active: true
+
+  # ── Audio layer ─────────────────────────────────────────────────────────────
+  - id: apple_music.audio.lossless_preferred
+    layer: audio
+    title: 24-bit / 96 kHz or higher recommended for Apple Lossless
+    description: >
+      Apple Music supports Apple Lossless (ALAC) at up to 24-bit / 192 kHz.
+      Delivering hi-res audio enables the Lossless and Hi-Res Lossless badges.
+    severity: info
+    category: audio_quality
+    fix_hint: Deliver master audio at 24-bit / 96 kHz or higher when available.
+    doc_url: https://help.apple.com/itc/musicstyleguide/
+    active: true
+
+  - id: apple_music.audio.dolby_atmos_channel_check
+    layer: audio
+    title: Dolby Atmos deliveries must include an ADM BWF master
+    description: >
+      Spatial audio tracks for Apple Music must be delivered as an ADM
+      Broadcast Wave (BWF) file alongside the stereo mix.
+    severity: warning
+    category: spatial_audio
+    fix_hint: Include the ADM BWF master file in your Dolby Atmos delivery package.
+    doc_url: null
+    active: true
+
+  - id: apple_music.audio.loudness_target
+    layer: audio
+    title: Integrated loudness should target −16 LUFS
+    description: >
+      Apple Music normalizes to −16 LUFS (Sound Check). Delivering at or
+      near −16 LUFS integrated avoids aggressive level adjustment.
+    severity: info
+    category: loudness
+    fix_hint: Re-master targeting −16 LUFS integrated loudness for Apple Music.
+    doc_url: null
+    active: true
+
+  # ── Artwork layer ───────────────────────────────────────────────────────────
+  - id: apple_music.artwork.minimum_resolution
+    layer: artwork
+    title: Artwork minimum resolution for Apple Music is 3000×3000 px
+    description: >
+      Apple Music requires artwork of at least 3000×3000 px in RGB JPEG format.
+    severity: critical
+    category: artwork
+    fix_hint: Export cover art as 3000×3000 px RGB JPEG (sRGB colour space).
+    doc_url: https://help.apple.com/itc/musicstyleguide/#/apdee6f2d073
+    active: true
+
+  - id: apple_music.artwork.rgb_color_space_required
+    layer: artwork
+    title: Artwork must use RGB colour space (not CMYK)
+    description: >
+      Apple Music rejects artwork in CMYK colour space. All artwork must be
+      converted to RGB (preferably sRGB) before delivery.
+    severity: critical
+    category: artwork
+    fix_hint: Convert artwork to RGB/sRGB colour space in Photoshop or equivalent.
+    doc_url: null
+    active: true
+
+  - id: apple_music.artwork.no_apple_logo
+    layer: artwork
+    title: Artwork must not contain Apple branding
+    description: >
+      Apple prohibits the use of its logos, trademarks, or branding in cover art.
+    severity: critical
+    category: artwork
+    fix_hint: Remove all Apple branding and logos from the artwork.
+    doc_url: null
+    active: true

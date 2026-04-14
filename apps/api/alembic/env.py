@@ -7,10 +7,14 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from database import Base
-import models.release  # noqa: F401 — ensure models are registered
-import models.pipeline  # noqa: F401
-import models.rule  # noqa: F401
-import models.report  # noqa: F401
+
+# Import every model so their tables are registered in Base.metadata
+import models.organization   # noqa: F401
+import models.release        # noqa: F401
+import models.track          # noqa: F401
+import models.scan           # noqa: F401
+import models.scan_result    # noqa: F401
+import models.rule           # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
