@@ -98,7 +98,14 @@ async def _handle_org_created(data: dict, db: AsyncSession) -> None:
         select(Organization).where(Organization.clerk_org_id == clerk_org_id)
     )
     if existing:
-        logger.info("Org %s already exists — skipping creation", clerk_org_id)
+        # On-demand creation may have used the slug as a placeholder name.
+        # Overwrite with the real display name from the webhook payload.
+        if name and existing.name != name:
+            existing.name = name
+            await db.commit()
+            logger.info("Org %s name corrected to '%s'", clerk_org_id, name)
+        else:
+            logger.info("Org %s already exists — skipping creation", clerk_org_id)
         return
 
     org = Organization(

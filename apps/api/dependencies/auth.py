@@ -115,6 +115,23 @@ async def _verify_clerk_jwt(token: str) -> dict[str, Any]:
 # FastAPI dependency
 # ---------------------------------------------------------------------------
 
+async def _fetch_clerk_org_name(clerk_org_id: str) -> str | None:
+    """Fetch the real display name of a Clerk org via the Management API."""
+    if not settings.clerk_secret_key:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                f"https://api.clerk.com/v1/organizations/{clerk_org_id}",
+                headers={"Authorization": f"Bearer {settings.clerk_secret_key}"},
+            )
+            if resp.status_code == 200:
+                return resp.json().get("name")
+    except Exception:
+        pass
+    return None
+
+
 async def get_current_org(
     authorization: str = Header(..., description="Bearer <clerk_session_token>"),
     db: AsyncSession = Depends(get_db),
@@ -149,7 +166,8 @@ async def get_current_org(
     if org is None:
         # Webhook may not have fired yet — create the org on-demand as a safe
         # fallback.  The webhook handler will be a no-op if the row already exists.
-        org_name: str = claims.get("org_slug") or clerk_org_id
+        # Try to fetch the real org name from Clerk's Management API.
+        org_name: str = await _fetch_clerk_org_name(clerk_org_id) or claims.get("org_slug") or clerk_org_id
         org = Organization(
             id=uuid.uuid4(),
             clerk_org_id=clerk_org_id,
