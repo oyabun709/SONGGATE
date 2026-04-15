@@ -292,6 +292,37 @@ class ScanOrchestrator:
 
         if "DDEX" in fmt:
             findings: list[DDEXFinding] = self.ddex_validator.validate(content)
+
+            # Extract metadata from the DDEX package and persist it so the
+            # metadata rules engine has real values to evaluate in layer 2.
+            try:
+                from services.ddex.validator import DDEXParser
+                from datetime import date as _date
+                parsed = DDEXParser().extract_metadata(content)
+                if parsed and "_error" not in parsed:
+                    existing = dict(release.metadata_ or {})
+                    existing.update(parsed)
+                    release.metadata_ = existing
+                    # Promote top-level DB columns if not already set
+                    if parsed.get("upc") and not release.upc:
+                        release.upc = parsed["upc"]
+                    if parsed.get("release_date") and not release.release_date:
+                        try:
+                            release.release_date = _date.fromisoformat(parsed["release_date"])
+                        except (ValueError, TypeError):
+                            pass
+                    await db.commit()
+                    await db.refresh(release)
+                    logger.info(
+                        "DDEX layer: extracted metadata for release %s — "
+                        "%d tracks, isrc_list=%s",
+                        release.id,
+                        len(parsed.get("tracks", [])),
+                        parsed.get("isrc_list", []),
+                    )
+            except Exception as exc:
+                logger.warning("DDEX layer: metadata extraction failed: %s", exc)
+
         elif fmt == "CSV":
             from services.ddex.csv_parser import CSVParser
             parse_result = CSVParser().parse(content)
@@ -385,7 +416,8 @@ class ScanOrchestrator:
 
         results: list[ScanResult] = []
         for sig in signals:
-            rule_id = f"fraud.{sig.signal_id}"
+            # signal_id already includes the "fraud." prefix (e.g. "fraud.short_track_duration")
+            rule_id = sig.signal_id if sig.signal_id.startswith("fraud.") else f"fraud.{sig.signal_id}"
             await self._ensure_rule(db, rule_id, "fraud", sig.severity)
             status = ResultStatus.warn if sig.is_advisory else ResultStatus.fail
             results.append(ScanResult(
@@ -635,14 +667,6 @@ class ScanOrchestrator:
         thirty_days_ago = "NOW() - INTERVAL '30 days'"
         seven_days_ago = "NOW() - INTERVAL '7 days'"
 
-        artist_count_result = await db.execute(
-            select(func.count()).select_from(Release).where(
-                Release.org_id == release.org_id,
-                Release.artist == release.artist,
-                Release.created_at >= func.now() - func.cast("30 days", type_=None),
-            )
-        )
-        # Simpler approach without func.cast for interval
         from sqlalchemy import text as sa_text
         artist_count_row = await db.execute(
             sa_text(

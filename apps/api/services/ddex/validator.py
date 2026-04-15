@@ -236,29 +236,47 @@ class DDEXParser:
         ns = _detect_namespace(root)
         prefix = f"{{{ns}}}" if ns else ""
 
+        # When the root element carries the namespace but child elements were
+        # written without a prefix (xmlns:ern= style), fall back to no-prefix.
+        def _find(parent: etree._Element, tag: str) -> etree._Element | None:
+            el = parent.find(f"{prefix}{tag}")
+            if el is None and prefix:
+                el = parent.find(tag)
+            return el
+
+        def _findall(parent: etree._Element, tag: str) -> list[etree._Element]:
+            els = parent.findall(f"{prefix}{tag}")
+            if not els and prefix:
+                els = parent.findall(tag)
+            return els
+
         meta: dict[str, Any] = {
             "version": _detect_ern_version(root),
             "profile": _detect_profile(root, prefix),
         }
 
         # MessageHeader
-        header = root.find(f"{prefix}MessageHeader")
+        header = _find(root, "MessageHeader")
         if header is not None:
-            meta["sender_party_id"] = _text(header, f"{prefix}SentOnBehalfOf/{prefix}PartyId")
-            meta["sender_name"] = _text(header, f"{prefix}SentOnBehalfOf/{prefix}PartyName/{prefix}FullName")
-            if not meta["sender_name"]:
-                meta["sender_name"] = _text(header, f"{prefix}MessageSender/{prefix}PartyName/{prefix}FullName")
-            meta["message_id"] = _text(header, f"{prefix}MessageId")
-            meta["message_created"] = _text(header, f"{prefix}MessageCreatedDateTime")
+            meta["sender_party_id"] = _text(header, f"{prefix}SentOnBehalfOf/{prefix}PartyId") or \
+                                      _text(header, "SentOnBehalfOf/PartyId")
+            meta["sender_name"] = _text(header, f"{prefix}SentOnBehalfOf/{prefix}PartyName/{prefix}FullName") or \
+                                   _text(header, "SentOnBehalfOf/PartyName/FullName") or \
+                                   _text(header, f"{prefix}MessageSender/{prefix}PartyName/{prefix}FullName") or \
+                                   _text(header, "MessageSender/PartyName/FullName")
+            meta["message_id"] = _text(header, f"{prefix}MessageId") or _text(header, "MessageId")
+            meta["message_created"] = _text(header, f"{prefix}MessageCreatedDateTime") or \
+                                      _text(header, "MessageCreatedDateTime")
 
         # ReleaseList — grab the primary release
-        release_list = root.find(f"{prefix}ReleaseList")
+        release_list = _find(root, "ReleaseList")
         if release_list is not None:
-            # Primary release is typically first, or the one with IsMainRelease=true
-            releases = release_list.findall(f"{prefix}Release")
+            releases = _findall(release_list, "Release")
             primary = None
             for rel in releases:
-                is_main = rel.findtext(f"{prefix}IsMainRelease") or ""
+                is_main = rel.get("IsMainRelease") or \
+                          rel.findtext(f"{prefix}IsMainRelease") or \
+                          rel.findtext("IsMainRelease") or ""
                 if is_main.lower() == "true":
                     primary = rel
                     break
@@ -268,13 +286,18 @@ class DDEXParser:
             if primary is not None:
                 meta.update(_extract_release_fields(primary, prefix))
 
-        # ResourceList — collect tracks / sound recordings
-        resource_list = root.find(f"{prefix}ResourceList")
+        # ResourceList — collect tracks / sound recordings + artwork dims
+        resource_list = _find(root, "ResourceList")
         if resource_list is not None:
-            meta["tracks"] = _extract_tracks(resource_list, prefix)
+            tracks, artwork = _extract_tracks(resource_list, prefix)
+            meta["tracks"] = tracks
+            meta.update(artwork)  # artwork_width, artwork_height if found
+
+        # Build isrc_list for the rules engine
+        meta["isrc_list"] = [t["isrc"] for t in meta.get("tracks", []) if "isrc" in t]
 
         # DealList
-        deal_list = root.find(f"{prefix}DealList")
+        deal_list = _find(root, "DealList")
         if deal_list is not None:
             meta["deals"] = _extract_deals(deal_list, prefix)
 
@@ -369,7 +392,14 @@ def _check_required_elements(root: etree._Element, norm_version: str) -> list[DD
     prefix = f"{{{ns}}}" if ns else ""
 
     for el_name in _REQUIRED_ELEMENTS.get(norm_version, []):
-        if root.find(f"{prefix}{el_name}") is None:
+        # Try namespaced lookup first, then fall back to un-namespaced.
+        # Real-world DDEX files often declare the namespace only on the root
+        # element with a prefix (xmlns:ern=...) leaving child elements without
+        # explicit namespace decoration — both forms are structurally valid.
+        found = root.find(f"{prefix}{el_name}")
+        if found is None and prefix:
+            found = root.find(el_name)
+        if found is None:
             findings.append(
                 DDEXFinding(
                     rule_id=f"ddex.structure.missing_{el_name.lower()}",
@@ -386,7 +416,11 @@ def _check_isrc_format(root: etree._Element, norm_version: str) -> list[DDEXFind
     ns = _detect_namespace(root)
     prefix = f"{{{ns}}}" if ns else ""
 
-    for el in root.iter(f"{prefix}ISRC"):
+    isrc_elements = list(root.iter(f"{prefix}ISRC"))
+    if not isrc_elements and prefix:
+        isrc_elements = list(root.iter("ISRC"))
+
+    for el in isrc_elements:
         val = (el.text or "").strip()
         if val and not _ISRC_RE.match(val):
             findings.append(
@@ -407,7 +441,11 @@ def _check_upc_format(root: etree._Element, norm_version: str) -> list[DDEXFindi
     ns = _detect_namespace(root)
     prefix = f"{{{ns}}}" if ns else ""
 
-    for el in root.iter(f"{prefix}UPC"):
+    upc_elements = list(root.iter(f"{prefix}UPC"))
+    if not upc_elements and prefix:
+        upc_elements = list(root.iter("UPC"))
+
+    for el in upc_elements:
         val = (el.text or "").strip()
         if val and not _UPC_RE.match(val):
             findings.append(
@@ -430,12 +468,15 @@ def _check_message_header(root: etree._Element, norm_version: str) -> list[DDEXF
     prefix = f"{{{ns}}}" if ns else ""
 
     header = root.find(f"{prefix}MessageHeader")
+    if header is None and prefix:
+        header = root.find("MessageHeader")
     if header is None:
         return findings  # already caught by _check_required_elements
 
+    child_prefix = prefix if header.find(f"{prefix}MessageId") is not None else ""
     required_header_fields = ["MessageId", "MessageSender", "MessageRecipient", "MessageCreatedDateTime"]
     for field_name in required_header_fields:
-        if header.find(f"{prefix}{field_name}") is None:
+        if header.find(f"{child_prefix}{field_name}") is None:
             findings.append(
                 DDEXFinding(
                     rule_id=f"ddex.header.missing_{field_name.lower()}",
@@ -461,108 +502,265 @@ def _text(element: etree._Element, path: str) -> str | None:
 
 
 def _extract_release_fields(release: etree._Element, prefix: str) -> dict[str, Any]:
+    """
+    Extract fields from a <Release> element.
+
+    DDEX ERN 4.x splits fields between the Release root and
+    <ReleaseDetailsByTerritory>.  We search both, preferring the
+    territory details block (which holds the display/delivery values).
+    """
     data: dict[str, Any] = {}
 
+    # Find ReleaseDetailsByTerritory — prefer "Worldwide", fall back to first
+    details_els = list(release.iter(f"{prefix}ReleaseDetailsByTerritory"))
+    if not details_els and prefix:
+        details_els = list(release.iter("ReleaseDetailsByTerritory"))
+    details: etree._Element | None = None
+    for d in details_els:
+        tc = d.findtext(f"{prefix}TerritoryCode") or d.findtext("TerritoryCode") or ""
+        if tc.lower() in ("worldwide", "ww", "001"):
+            details = d
+            break
+    if details is None and details_els:
+        details = details_els[0]
+
+    # Helper: search release root then details block
+    def _get(tag: str) -> str | None:
+        for el in ([release, details] if details is not None else [release]):
+            v = el.findtext(f"{prefix}{tag}") or el.findtext(tag)
+            if v and v.strip():
+                return v.strip()
+        return None
+
+    def _find_el(tag: str) -> etree._Element | None:
+        for el in ([release, details] if details is not None else [release]):
+            found = el.find(f"{prefix}{tag}") or el.find(tag)
+            if found is not None:
+                return found
+        return None
+
     # Release reference
-    ref = _text(release, f"{prefix}ReleaseReference")
+    ref = _get("ReleaseReference")
     if ref:
         data["release_reference"] = ref
 
     # GRid
-    grid = _text(release, f"{prefix}ReleaseId/{prefix}GRid")
-    if grid:
-        data["grid"] = grid
+    rid = _find_el("ReleaseId")
+    if rid is not None:
+        grid = rid.findtext(f"{prefix}GRid") or rid.findtext("GRid")
+        if grid:
+            data["grid"] = grid.strip()
+        icpn = rid.findtext(f"{prefix}ICPN") or rid.findtext("ICPN")
+        if icpn:
+            data["upc"] = icpn.strip()
 
-    # ICPN (UPC/EAN for album)
-    icpn = _text(release, f"{prefix}ReleaseId/{prefix}ICPN")
-    if icpn:
-        data["upc"] = icpn
-
-    # Title
-    title = _text(release, f"{prefix}ReferenceTitle/{prefix}TitleText")
-    if not title:
-        title = _text(release, f"{prefix}Title/{prefix}TitleText")
-    if title:
-        data["title"] = title
-
-    # Artist
-    artist_el = release.find(f"{prefix}DisplayArtistName")
-    if artist_el is None:
-        # Fallback: first DisplayArtist
-        for da in release.iter(f"{prefix}DisplayArtist"):
-            artist_el = da.find(f"{prefix}PartyName/{prefix}FullName")
+    # Title — ReferenceTitle first, then display Title
+    for title_path in (
+        f"{prefix}ReferenceTitle/{prefix}TitleText", "ReferenceTitle/TitleText",
+        f"{prefix}Title/{prefix}TitleText", "Title/TitleText",
+    ):
+        title = release.findtext(title_path)
+        if not title and details is not None:
+            title = details.findtext(title_path)
+        if title and title.strip():
+            data["title"] = title.strip()
             break
-    data["artist"] = artist_el.text.strip() if artist_el is not None and artist_el.text else None
 
-    # Release date
-    release_date = _text(release, f"{prefix}ReleaseDate")
-    if release_date:
-        data["release_date"] = release_date
+    # Artist — DisplayArtistName shortcut, then DisplayArtist/PartyName/FullName
+    for search_el in ([details, release] if details is not None else [release]):
+        if search_el is None:
+            continue
+        dan = search_el.findtext(f"{prefix}DisplayArtistName") or search_el.findtext("DisplayArtistName")
+        if dan and dan.strip():
+            data["artist"] = dan.strip()
+            break
+        for da in search_el.iter(f"{prefix}DisplayArtist"):
+            fn = da.findtext(f"{prefix}PartyName/{prefix}FullName") or da.findtext("PartyName/FullName")
+            if fn and fn.strip():
+                data["artist"] = fn.strip()
+                break
+        if "artist" in data:
+            break
+
+    # Release date — OriginalReleaseDate preferred, then ReleaseDate
+    for tag in ("OriginalReleaseDate", "ReleaseDate"):
+        rd = _get(tag)
+        if rd:
+            data["release_date"] = rd
+            break
 
     # Release type
-    data["release_type"] = _text(release, f"{prefix}ReleaseType")
+    rt = _get("ReleaseType")
+    if rt:
+        data["release_type"] = rt
 
     # Label
-    data["label"] = _text(release, f"{prefix}LabelName")
+    label = _get("LabelName")
+    if label:
+        data["label"] = label
 
-    # CLine / PLine
-    data["c_line"] = _text(release, f"{prefix}CLineWithYear/{prefix}CLine") or _text(release, f"{prefix}CLine")
-    data["p_line"] = _text(release, f"{prefix}PLineWithYear/{prefix}PLine") or _text(release, f"{prefix}PLine")
+    # CLine
+    c = None
+    for search_el in ([details, release] if details is not None else [release]):
+        if search_el is None:
+            continue
+        # Try nested CLine/CLineText first (ERN 4.x style)
+        for cline_el in list(search_el.iter(f"{prefix}CLine")) + list(search_el.iter("CLine")):
+            ct = cline_el.findtext(f"{prefix}CLineText") or cline_el.findtext("CLineText") or \
+                 (cline_el.text or "").strip()
+            if ct and ct.strip():
+                c = ct.strip()
+                break
+        if c:
+            break
+    if c:
+        data["c_line"] = c
+
+    # PLine
+    p = None
+    p_year = None
+    for search_el in ([details, release] if details is not None else [release]):
+        if search_el is None:
+            continue
+        for pline_el in list(search_el.iter(f"{prefix}PLine")) + list(search_el.iter("PLine")):
+            py = pline_el.findtext(f"{prefix}Year") or pline_el.findtext("Year")
+            if py and py.strip():
+                p_year = py.strip()
+            pt = pline_el.findtext(f"{prefix}PLineText") or pline_el.findtext("PLineText") or \
+                 (pline_el.text or "").strip()
+            if pt and pt.strip():
+                p = pt.strip()
+                break
+        if p:
+            break
+    if p:
+        data["p_line"] = p
+    if p_year:
+        data["p_line_year"] = p_year
 
     # Genre
-    genre_el = release.find(f"{prefix}Genre/{prefix}GenreText")
-    if genre_el is None:
-        genre_el = release.find(f"{prefix}MainGenre/{prefix}GenreText")
-    data["genre"] = genre_el.text.strip() if genre_el is not None and genre_el.text else None
+    for search_el in ([details, release] if details is not None else [release]):
+        if search_el is None:
+            continue
+        for genre_tag in (f"{prefix}Genre", "Genre", f"{prefix}MainGenre", "MainGenre"):
+            genre_el = search_el.find(genre_tag)
+            if genre_el is not None:
+                gt = genre_el.findtext(f"{prefix}GenreText") or genre_el.findtext("GenreText")
+                if gt and gt.strip():
+                    data["genre"] = gt.strip()
+                    break
+        if "genre" in data:
+            break
 
     # Parental warning
-    data["parental_warning"] = _text(release, f"{prefix}ParentalWarningType")
+    pw = _get("ParentalWarningType")
+    if pw:
+        data["parental_warning"] = pw
 
     return {k: v for k, v in data.items() if v is not None}
+
+
+def _ft(el: etree._Element, prefix: str, *paths: str) -> str | None:
+    """Find text with namespace fallback across multiple candidate paths."""
+    for path in paths:
+        v = el.findtext(f"{prefix}{path}") if prefix else None
+        if v and v.strip():
+            return v.strip()
+        v = el.findtext(path)
+        if v and v.strip():
+            return v.strip()
+    return None
 
 
 def _extract_tracks(resource_list: etree._Element, prefix: str) -> list[dict[str, Any]]:
     tracks: list[dict[str, Any]] = []
 
-    for sr in resource_list.iter(f"{prefix}SoundRecording"):
+    # Try namespaced iter first; fall back to un-namespaced when child elements
+    # carry no namespace (xmlns:ern= prefix-only declaration on root).
+    sound_recordings = list(resource_list.iter(f"{prefix}SoundRecording"))
+    if not sound_recordings and prefix:
+        sound_recordings = list(resource_list.iter("SoundRecording"))
+
+    for sr in sound_recordings:
         track: dict[str, Any] = {}
 
-        isrc = _text(sr, f"{prefix}SoundRecordingId/{prefix}ISRC")
+        # ISRC
+        isrc = _ft(sr, prefix,
+                   f"SoundRecordingId/ISRC",
+                   f"SoundRecordingId/{prefix}ISRC") or \
+               (sr.findtext(f"{prefix}SoundRecordingId/{prefix}ISRC") or "").strip() or None
+        # Simpler: just iterate ISRC elements inside this SoundRecording
+        for isrc_el in list(sr.iter(f"{prefix}ISRC")) + list(sr.iter("ISRC")):
+            v = (isrc_el.text or "").strip()
+            if v:
+                isrc = v
+                break
         if isrc:
             track["isrc"] = isrc
 
-        title = _text(sr, f"{prefix}ReferenceTitle/{prefix}TitleText")
-        if not title:
-            title = _text(sr, f"{prefix}Title/{prefix}TitleText")
+        # Title
+        title = (_ft(sr, prefix, "ReferenceTitle/TitleText") or
+                 _ft(sr, prefix, "Title/TitleText"))
         if title:
             track["title"] = title
 
         # Duration (ISO 8601 — PT3M45S)
-        duration = _text(sr, f"{prefix}Duration")
+        duration = _ft(sr, prefix, "Duration")
         if duration:
             track["duration_iso"] = duration
             track["duration_ms"] = _iso8601_to_ms(duration)
+            track["duration_s"] = round(_iso8601_to_ms(duration) / 1000) if _iso8601_to_ms(duration) else None
+
+        # Publisher — DisplayPublisher/PartyName/FullName
+        publisher_els = list(sr.iter(f"{prefix}DisplayPublisher")) + list(sr.iter("DisplayPublisher"))
+        if publisher_els:
+            pub_name = _ft(publisher_els[0], prefix, "PartyName/FullName")
+            if pub_name:
+                track["publisher"] = pub_name
+        track["has_publisher"] = bool(publisher_els)
 
         # Artist
-        for da in sr.iter(f"{prefix}DisplayArtist"):
-            name = _text(da, f"{prefix}PartyName/{prefix}FullName")
+        for da in list(sr.iter(f"{prefix}DisplayArtist")) + list(sr.iter("DisplayArtist")):
+            name = _ft(da, prefix, "PartyName/FullName")
             if name:
                 track["artist"] = name
-            break
+                break
 
-        # Sequence number
-        seq = _text(sr, f"{prefix}SequenceNumber")
-        if seq:
-            track["sequence_number"] = int(seq) if seq.isdigit() else seq
-
-        # Resource reference (links to ReleaseList)
-        ref = _text(sr, f"{prefix}ResourceReference")
+        # Resource reference
+        ref = _ft(sr, prefix, "ResourceReference")
         if ref:
             track["resource_reference"] = ref
 
         tracks.append(track)
 
-    return tracks
+    # Also extract artwork dimensions from Image resources in the same ResourceList
+    image_els = list(resource_list.iter(f"{prefix}Image")) + list(resource_list.iter("Image"))
+    artwork: dict[str, Any] = {}
+    for img in image_els:
+        img_type = _ft(img, prefix, "ImageType")
+        if img_type and "front" not in img_type.lower() and "cover" not in img_type.lower():
+            continue
+        # ImageHeight/ImageWidth may be nested inside ImageDetailsByTerritory
+        for h_tag in (f"{prefix}ImageHeight", "ImageHeight"):
+            el = next(img.iter(h_tag), None)
+            if el is not None and (el.text or "").strip():
+                try:
+                    artwork["artwork_height"] = int(el.text.strip())
+                except ValueError:
+                    pass
+                break
+        for w_tag in (f"{prefix}ImageWidth", "ImageWidth"):
+            el = next(img.iter(w_tag), None)
+            if el is not None and (el.text or "").strip():
+                try:
+                    artwork["artwork_width"] = int(el.text.strip())
+                except ValueError:
+                    pass
+                break
+        if artwork:
+            break  # use first matching image
+
+    return tracks, artwork
 
 
 def _extract_deals(deal_list: etree._Element, prefix: str) -> list[dict[str, Any]]:

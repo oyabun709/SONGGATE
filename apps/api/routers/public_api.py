@@ -43,7 +43,7 @@ import uuid
 from datetime import date, datetime, timezone, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,7 +63,7 @@ router = APIRouter(prefix="/api/v1", tags=["Public API v1"])
 # API key helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-_KEY_PREFIX_LEN = 16   # visible prefix stored in DB for identification
+_KEY_PREFIX_LEN = 8    # visible prefix stored in DB — ropqa_sk_ (9) + 8 = 17 chars, fits VARCHAR(20)
 _KEY_TOTAL_LEN  = 40   # random hex suffix length (total entropy: 160 bits)
 _KEY_SCHEME     = "ropqa_sk_"
 
@@ -157,6 +157,13 @@ class APIKeyCreate(BaseModel):
         max_length=120,
         description="Human-readable label for this key.",
         examples=["CI pipeline", "Distributor webhook"],
+    )
+    org_id: str | None = Field(
+        None,
+        description=(
+            "Organization UUID. Required only when using the admin bootstrap token "
+            "(`Authorization: Bearer <admin_token>`). Ignored for normal API-key auth."
+        ),
     )
 
 
@@ -468,9 +475,57 @@ class ShareTokenOut(BaseModel):
 )
 async def create_api_key(
     payload: APIKeyCreate,
-    org: OrgDep,
     db: AsyncSession = Depends(get_db),
+    authorization: str | None = Header(None),
 ) -> APIKeyCreated:
+    from config import settings
+
+    # ── Resolve org: normal API-key auth OR dev admin bootstrap ───────────────
+    org: Organization | None = None
+
+    if authorization:
+        scheme, _, raw_key = authorization.partition(" ")
+        if scheme.lower() == "bearer":
+            # Admin bootstrap path (dev only)
+            if (
+                settings.admin_token
+                and settings.environment in ("development", "test")
+                and raw_key == settings.admin_token
+            ):
+                if not payload.org_id:
+                    raise HTTPException(
+                        status.HTTP_400_BAD_REQUEST,
+                        detail="org_id is required when using the admin bootstrap token.",
+                    )
+                try:
+                    org_uuid = uuid.UUID(payload.org_id)
+                except ValueError:
+                    raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid org_id")
+                result = await db.execute(select(Organization).where(Organization.id == org_uuid))
+                org = result.scalar_one_or_none()
+                if org is None:
+                    raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Organization not found")
+            # Normal API-key auth path
+            elif raw_key.startswith(_KEY_SCHEME):
+                key_hash = _hash_key(raw_key)
+                result = await db.execute(select(APIKey).where(APIKey.key_hash == key_hash))
+                api_key_row = result.scalar_one_or_none()
+                if api_key_row is None or api_key_row.revoked:
+                    raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid or revoked API key")
+                api_key_row.last_used_at = datetime.now(timezone.utc)
+                await db.commit()
+                org_result = await db.execute(select(Organization).where(Organization.id == api_key_row.org_id))
+                org = org_result.scalar_one_or_none()
+
+    if org is None:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                "Provide a valid 'Authorization: Bearer ropqa_sk_…' header, "
+                "or use the admin bootstrap token with org_id in the request body."
+            ),
+        )
+
     plaintext = _generate_key()
     api_key = APIKey(
         id=uuid.uuid4(),
@@ -625,6 +680,116 @@ async def create_release(
             release_id=release_id,
             scan_id=scan_id,
             org_id=org_id,
+        )
+
+    return PublicReleaseWithScan(
+        release=PublicReleaseOut.model_validate(release),
+        scan=PublicScanOut.model_validate(scan_out) if scan_out else None,
+    )
+
+
+@router.post(
+    "/releases/upload-ddex",
+    response_model=PublicReleaseWithScan,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Upload DDEX XML and create release",
+    description=(
+        "Accept a DDEX ERN XML file (`multipart/form-data`). "
+        "The file is uploaded to S3, parsed to extract title/artist/ISRC metadata, "
+        "and a release record is created. If `trigger_scan` is true (default) a QA "
+        "scan starts immediately and the response includes a `scan` object with "
+        "`status: queued`. Poll `GET /api/v1/scans/{scan_id}` for results."
+    ),
+)
+async def upload_ddex(
+    background_tasks: BackgroundTasks,
+    org: OrgDep,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(..., description="DDEX ERN XML file"),
+    trigger_scan: bool = Form(True, description="Immediately queue a QA scan"),
+    external_id: str | None = Form(None, description="Your internal release ID"),
+) -> PublicReleaseWithScan:
+    import boto3, re as _re
+    from botocore.config import Config as BotoConfig
+    from config import settings
+    from services.ddex.validator import DDEXParser
+
+    content = await file.read()
+
+    # ── Parse DDEX to extract title / artist ───────────────────────────────
+    title = "Unknown Release"
+    artist = "Unknown Artist"
+    try:
+        parsed = DDEXParser().extract_metadata(content)
+        if parsed.get("title"):
+            title = parsed["title"]
+        if parsed.get("artist"):
+            artist = parsed["artist"]
+    except Exception:
+        pass  # fall back to defaults; validator will catch any structural issues
+
+    # ── Upload XML to S3 ───────────────────────────────────────────────────
+    safe_name = _re.sub(r"[^\w.\-]", "_", file.filename or "release.xml")
+    s3_key = f"ropqa/{org.id}/releases/ddex-uploads/{uuid.uuid4()}/{safe_name}"
+
+    s3_kwargs: dict = {"region_name": settings.aws_region}
+    if settings.aws_access_key_id:
+        s3_kwargs["aws_access_key_id"] = settings.aws_access_key_id
+        s3_kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
+    if settings.s3_endpoint_url:
+        s3_kwargs["endpoint_url"] = settings.s3_endpoint_url
+
+    s3 = boto3.client("s3", **s3_kwargs)
+    s3.put_object(
+        Bucket=settings.s3_bucket,
+        Key=s3_key,
+        Body=content,
+        ContentType="application/xml",
+    )
+
+    # Store the container-accessible URL so the worker can download it
+    raw_package_url = (
+        f"{settings.s3_endpoint_url}/{settings.s3_bucket}/{s3_key}"
+        if settings.s3_endpoint_url
+        else f"s3://{settings.s3_bucket}/{s3_key}"
+    )
+
+    # ── Create release row ─────────────────────────────────────────────────
+    release = Release(
+        id=uuid.uuid4(),
+        org_id=org.id,
+        external_id=external_id,
+        title=title,
+        artist=artist,
+        submission_format=SubmissionFormat.DDEX_ERN_43,
+        raw_package_url=raw_package_url,
+        status=ReleaseStatus.ingesting,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(release)
+    await db.flush()
+
+    scan_out: Scan | None = None
+    if trigger_scan:
+        scan_out = Scan(
+            id=uuid.uuid4(),
+            release_id=release.id,
+            org_id=org.id,
+            status=ScanStatus.queued,
+            layers_run=[],
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(scan_out)
+
+    await db.commit()
+    await db.refresh(release)
+    if scan_out:
+        await db.refresh(scan_out)
+        background_tasks.add_task(
+            _run_scan_bg,
+            release_id=str(release.id),
+            scan_id=str(scan_out.id),
+            org_id=str(org.id),
         )
 
     return PublicReleaseWithScan(

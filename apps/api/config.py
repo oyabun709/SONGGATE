@@ -40,5 +40,9 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
 
+    # Dev-only: admin bootstrap token for creating the first API key.
+    # Set to empty string to disable.  Never expose in production.
+    admin_token: str = "songgate-dev-admin"
+
 
 settings = Settings()

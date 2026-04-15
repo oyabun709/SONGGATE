@@ -372,6 +372,7 @@ class FraudScreener:
         signals: list[FraudSignal] = []
 
         signals.extend(self._check_functional_music_spam(metadata))
+        signals.extend(self._check_short_track_duration(metadata))
         signals.extend(self._check_artist_name_similarity(metadata))
         signals.extend(self._check_release_velocity(metadata, org_id, velocity))
         signals.extend(self._check_generic_titles(metadata))
@@ -497,6 +498,54 @@ class FraudScreener:
                 prefixes[prefix] = prefixes.get(prefix, 0) + 1
         # Only count if multiple tracks share the same prefix
         return sum(v for v in prefixes.values() if v >= 2)
+
+    # ── Detection: short track duration ──────────────────────────────────────
+
+    SHORT_TRACK_THRESHOLD_S = 60  # DSPs flag tracks under 60 seconds
+
+    def _check_short_track_duration(self, metadata: Any) -> list[FraudSignal]:
+        """
+        Flag releases containing tracks shorter than 60 seconds.
+        Sub-60s tracks are a known music-spam signal: they game per-stream
+        royalty payments by packing more 'plays' into a listening session.
+        """
+        tracks = metadata.tracks
+        if not tracks:
+            return []
+
+        short_tracks: list[dict] = []
+        for t in tracks:
+            dur_s = t.get("duration_s")
+            if dur_s is not None and isinstance(dur_s, (int, float)) and dur_s < self.SHORT_TRACK_THRESHOLD_S:
+                short_tracks.append({
+                    "title": t.get("title", "Unknown"),
+                    "duration_s": dur_s,
+                    "isrc": t.get("isrc", ""),
+                })
+
+        if not short_tracks:
+            return []
+
+        defn = self._get_definition("fraud.short_track_duration")
+        titles = ", ".join(f"'{t['title']}' ({t['duration_s']}s)" for t in short_tracks[:3])
+        return [
+            FraudSignal(
+                signal_id="fraud.short_track_duration",
+                confidence="high",
+                explanation=(
+                    f"{len(short_tracks)} track(s) in this release are under "
+                    f"{self.SHORT_TRACK_THRESHOLD_S} seconds: {titles}. "
+                    "Sub-60s tracks are a music-spam signal associated with "
+                    "stream-count manipulation and are frequently rejected by DSPs."
+                ),
+                resolution=defn.resolution,
+                is_advisory=defn.advisory,
+                severity=defn.severity,
+                matched_value=titles,
+                category=defn.category,
+                details={"short_tracks": short_tracks, "threshold_s": self.SHORT_TRACK_THRESHOLD_S},
+            )
+        ]
 
     # ── Detection: artist name similarity & homoglyphs ────────────────────────
 

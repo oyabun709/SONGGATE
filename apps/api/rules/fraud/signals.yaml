@@ -146,3 +146,21 @@ signals:
       Obtain new ISRCs for any tracks that reuse an existing ISRC. Contact your
       national ISRC agency or distributor. This flag is not advisory — the
       conflicting ISRCs must be resolved before delivery can proceed.
+
+  # ── Short track duration ──────────────────────────────────────────────────────
+  - id: fraud.short_track_duration
+    name: Short Track Duration (Sub-60s)
+    category: spam
+    severity: warning
+    advisory: false
+    description: >
+      One or more tracks in this release are shorter than 60 seconds. Sub-60s
+      tracks are a well-documented music-spam signal: they allow artists to
+      maximize per-stream royalty counts by cycling through short loops more
+      frequently. Spotify, Apple Music, and Amazon Music routinely remove or
+      demonetize releases containing abnormally short tracks.
+    resolution: >
+      Ensure all tracks are at least 60 seconds in length. If the track is
+      intentionally short (e.g. an intro/outro skit), document this in the release
+      notes and reach out to the DSP for case-by-case review. If the duration
+      metadata is incorrect, re-export with accurate duration tags.
