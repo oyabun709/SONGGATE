@@ -1,0 +1,577 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DDEX ERN 4.3 NewReleaseMessage — TEST FILE
+  Release:  Luminous Decay
+  Artist:   Nova Crest
+  Label:    Celestial Sound Group
+  Generated: 2026-04-14
+
+  ⚠ INTENTIONAL ERRORS (for SONGGATE QA testing):
+    1. Track 2 (A2) — DisplayPublisher element omitted entirely
+    2. Track 3 (A3) — ISRC "USABC123" is malformed (correct: CC-XXX-YY-NNNNN)
+    3. Image resource (A4) — ImageHeight/ImageWidth declared as 2000×2000 px
+    4. Track 3 (A3) — Duration PT48S (48 seconds) is a music-spam fraud signal
+-->
+<ern:NewReleaseMessage
+  xmlns:ern="http://ddex.net/xml/ern/43"
+  xmlns:avs="http://ddex.net/xml/avs/avs"
+  MessageSchemaVersionId="ern/43"
+  LanguageAndScriptCode="en">
+
+  <!-- ═══════════════════════════════════════════════════════
+       MESSAGE HEADER
+       ═══════════════════════════════════════════════════════ -->
+  <MessageHeader>
+    <MessageThreadId>MSG-2026-041401-NCREST</MessageThreadId>
+    <MessageId>MSG-2026-041401-NCREST-001</MessageId>
+    <MessageSender>
+      <PartyId>PADPIDAA12345678X</PartyId>
+      <PartyName>
+        <FullName>Celestial Sound Group</FullName>
+      </PartyName>
+    </MessageSender>
+    <SentOnBehalfOf>
+      <PartyId>PADPIDAA12345679X</PartyId>
+      <PartyName>
+        <FullName>Nova Crest</FullName>
+      </PartyName>
+    </SentOnBehalfOf>
+    <MessageRecipient>
+      <PartyId>PADPIDAA99999999X</PartyId>
+      <PartyName>
+        <FullName>Digital Service Provider</FullName>
+      </PartyName>
+    </MessageRecipient>
+    <MessageCreatedDateTime>2026-04-14T10:00:00Z</MessageCreatedDateTime>
+    <MessageControlType>LiveMessage</MessageControlType>
+  </MessageHeader>
+
+  <!-- ═══════════════════════════════════════════════════════
+       PARTY LIST
+       ═══════════════════════════════════════════════════════ -->
+  <PartyList>
+    <Party>
+      <PartyReference>P1</PartyReference>
+      <PartyId>IPI:00000000000</PartyId>
+      <PartyName>
+        <FullName>Nova Crest</FullName>
+      </PartyName>
+    </Party>
+    <Party>
+      <PartyReference>P2</PartyReference>
+      <PartyId>IPI:00000000001</PartyId>
+      <PartyName>
+        <FullName>Celestial Sound Group</FullName>
+      </PartyName>
+    </Party>
+    <Party>
+      <PartyReference>P3</PartyReference>
+      <PartyId>IPI:00000000002</PartyId>
+      <PartyName>
+        <FullName>Ether Music Publishing</FullName>
+      </PartyName>
+    </Party>
+  </PartyList>
+
+  <!-- ═══════════════════════════════════════════════════════
+       RESOURCE LIST
+       ═══════════════════════════════════════════════════════ -->
+  <ResourceList>
+
+    <!-- ─── Track 1: Stellar Drift — CLEAN ─────────────────── -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId>
+        <ISRC>US-ABC-26-00001</ISRC>
+      </SoundRecordingId>
+      <ResourceReference>A1</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Stellar Drift</TitleText>
+      </ReferenceTitle>
+      <Duration>PT4M12S</Duration>
+      <CreationDate>2025-11-03</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>Stellar Drift</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <!-- Publisher correctly declared on Track 1 -->
+        <DisplayPublisher SequenceNumber="1">
+          <PartyReference>P3</PartyReference>
+          <PartyName>
+            <FullName>Ether Music Publishing</FullName>
+          </PartyName>
+        </DisplayPublisher>
+        <Contributor>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <Role>Composer</Role>
+        </Contributor>
+        <PLine>
+          <Year>2026</Year>
+          <PLineText>℗ 2026 Celestial Sound Group</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>© 2026 Nova Crest / Celestial Sound Group</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Electronic</GenreText>
+          <SubGenre>Ambient Electronic</SubGenre>
+        </Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T1</TechnicalResourceDetailsReference>
+          <AudioCodecType>FLAC</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>24</BitsPerSample>
+          <File>
+            <FileName>nova_crest-stellar_drift.flac</FileName>
+            <FilePath>audio/</FilePath>
+            <HashSum>
+              <Algorithm>MD5</Algorithm>
+              <HashSumValue>a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6</HashSumValue>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- ─── Track 2: Echoes in Violet — ERROR: Missing Publisher ─── -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId>
+        <ISRC>US-ABC-26-00002</ISRC>
+      </SoundRecordingId>
+      <ResourceReference>A2</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Echoes in Violet</TitleText>
+      </ReferenceTitle>
+      <Duration>PT3M58S</Duration>
+      <CreationDate>2025-11-10</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>Echoes in Violet</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <!-- ⚠ ERROR 1: DisplayPublisher intentionally omitted for Track 2 -->
+        <Contributor>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <Role>Composer</Role>
+        </Contributor>
+        <PLine>
+          <Year>2026</Year>
+          <PLineText>℗ 2026 Celestial Sound Group</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>© 2026 Nova Crest / Celestial Sound Group</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Electronic</GenreText>
+          <SubGenre>Ambient Electronic</SubGenre>
+        </Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T2</TechnicalResourceDetailsReference>
+          <AudioCodecType>FLAC</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>24</BitsPerSample>
+          <File>
+            <FileName>nova_crest-echoes_in_violet.flac</FileName>
+            <FilePath>audio/</FilePath>
+            <HashSum>
+              <Algorithm>MD5</Algorithm>
+              <HashSumValue>b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7</HashSumValue>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- ─── Track 3: Sleep Sounds Vol 1 — ERROR: Bad ISRC + 48s duration ─── -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId>
+        <!-- ⚠ ERROR 2: Malformed ISRC — correct format is CC-XXX-YY-NNNNN (e.g. US-ABC-26-00003) -->
+        <ISRC>USABC123</ISRC>
+      </SoundRecordingId>
+      <ResourceReference>A3</ResourceReference>
+      <ReferenceTitle>
+        <!-- ⚠ ERROR 4 (fraud signal): Track title "Sleep Sounds Vol 1" combined with 48s duration
+             matches known streaming-fraud patterns (short ambient/sleep content padding catalogs) -->
+        <TitleText>Sleep Sounds Vol 1</TitleText>
+      </ReferenceTitle>
+      <!-- ⚠ ERROR 4: 48-second track duration — below the 60s threshold used by most DSPs
+           for royalty eligibility; combined with title, this is a music-spam fraud signal -->
+      <Duration>PT48S</Duration>
+      <CreationDate>2025-12-01</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>Sleep Sounds Vol 1</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayPublisher SequenceNumber="1">
+          <PartyReference>P3</PartyReference>
+          <PartyName>
+            <FullName>Ether Music Publishing</FullName>
+          </PartyName>
+        </DisplayPublisher>
+        <Contributor>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <Role>Composer</Role>
+        </Contributor>
+        <PLine>
+          <Year>2026</Year>
+          <PLineText>℗ 2026 Celestial Sound Group</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>© 2026 Nova Crest / Celestial Sound Group</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Ambient</GenreText>
+          <SubGenre>Sleep Sounds</SubGenre>
+        </Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T3</TechnicalResourceDetailsReference>
+          <AudioCodecType>FLAC</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>24</BitsPerSample>
+          <File>
+            <FileName>nova_crest-sleep_sounds_vol_1.flac</FileName>
+            <FilePath>audio/</FilePath>
+            <HashSum>
+              <Algorithm>MD5</Algorithm>
+              <HashSumValue>c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8</HashSumValue>
+            </HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- ─── Artwork — ERROR: 2000×2000 px (below 3000×3000 minimum) ─── -->
+    <Image>
+      <ImageType>FrontCoverImage</ImageType>
+      <ImageId>
+        <ProprietaryId Namespace="DDEX-LocalImageId">IMG-001</ProprietaryId>
+      </ImageId>
+      <ResourceReference>A4</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Luminous Decay — Front Cover</TitleText>
+      </ReferenceTitle>
+      <CreationDate>2026-01-15</CreationDate>
+      <ImageDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <!-- ⚠ ERROR 3: ImageHeight and ImageWidth are 2000 px.
+             Apple Music minimum is 3000×3000; most DSPs require ≥3000 px.
+             This will trigger a readiness failure for Apple Music, Amazon, Tidal. -->
+        <ImageHeight>2000</ImageHeight>
+        <ImageWidth>2000</ImageWidth>
+        <ImageCodecType>JPEG</ImageCodecType>
+        <ImageResolution>72</ImageResolution>
+        <TechnicalImageDetails>
+          <TechnicalResourceDetailsReference>T4</TechnicalResourceDetailsReference>
+          <ImageCodecType>JPEG</ImageCodecType>
+          <ImageHeight>2000</ImageHeight>
+          <ImageWidth>2000</ImageWidth>
+          <ColorModel>RGB</ColorModel>
+          <File>
+            <FileName>luminous_decay_cover.jpg</FileName>
+            <FilePath>artwork/</FilePath>
+            <HashSum>
+              <Algorithm>MD5</Algorithm>
+              <HashSumValue>d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9</HashSumValue>
+            </HashSum>
+          </File>
+        </TechnicalImageDetails>
+      </ImageDetailsByTerritory>
+    </Image>
+
+  </ResourceList>
+
+  <!-- ═══════════════════════════════════════════════════════
+       RELEASE LIST
+       ═══════════════════════════════════════════════════════ -->
+  <ReleaseList>
+
+    <!-- ─── Album release ───────────────────────────────────── -->
+    <Release IsMainRelease="true">
+      <ReleaseReference>R0</ReleaseReference>
+      <ReleaseType>Album</ReleaseType>
+      <ReleaseId>
+        <GRid>A1BCDE2026NC001X</GRid>
+        <ICPN>0123456789012</ICPN>
+      </ReleaseId>
+      <ReferenceTitle>
+        <TitleText>Luminous Decay</TitleText>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A1</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A2</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A3</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="SecondaryResource">A4</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Nova Crest</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <LabelName>Celestial Sound Group</LabelName>
+        <Title TitleType="FormalTitle">
+          <TitleText>Luminous Decay</TitleText>
+        </Title>
+        <PLine>
+          <Year>2026</Year>
+          <PLineText>℗ 2026 Celestial Sound Group</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>© 2026 Nova Crest / Celestial Sound Group</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Electronic</GenreText>
+          <SubGenre>Ambient Electronic</SubGenre>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <OriginalReleaseDate>2026-05-01</OriginalReleaseDate>
+        <ReleaseDate>2026-05-01</ReleaseDate>
+      </ReleaseDetailsByTerritory>
+    </Release>
+
+    <!-- ─── Track release 1: Stellar Drift ─────────────────── -->
+    <Release>
+      <ReleaseReference>R1</ReleaseReference>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseId>
+        <ICPN>0123456789013</ICPN>
+      </ReleaseId>
+      <ReferenceTitle>
+        <TitleText>Stellar Drift</TitleText>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A1</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="SecondaryResource">A4</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Nova Crest</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <LabelName>Celestial Sound Group</LabelName>
+        <Title TitleType="FormalTitle">
+          <TitleText>Stellar Drift</TitleText>
+        </Title>
+        <PLine>
+          <Year>2026</Year>
+          <PLineText>℗ 2026 Celestial Sound Group</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>© 2026 Nova Crest / Celestial Sound Group</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Electronic</GenreText>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <OriginalReleaseDate>2026-05-01</OriginalReleaseDate>
+        <ReleaseDate>2026-05-01</ReleaseDate>
+        <SequenceNumber>1</SequenceNumber>
+      </ReleaseDetailsByTerritory>
+    </Release>
+
+    <!-- ─── Track release 2: Echoes in Violet ──────────────── -->
+    <Release>
+      <ReleaseReference>R2</ReleaseReference>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseId>
+        <ICPN>0123456789014</ICPN>
+      </ReleaseId>
+      <ReferenceTitle>
+        <TitleText>Echoes in Violet</TitleText>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A2</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="SecondaryResource">A4</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Nova Crest</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <LabelName>Celestial Sound Group</LabelName>
+        <Title TitleType="FormalTitle">
+          <TitleText>Echoes in Violet</TitleText>
+        </Title>
+        <PLine>
+          <Year>2026</Year>
+          <PLineText>℗ 2026 Celestial Sound Group</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>© 2026 Nova Crest / Celestial Sound Group</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Electronic</GenreText>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <OriginalReleaseDate>2026-05-01</OriginalReleaseDate>
+        <ReleaseDate>2026-05-01</ReleaseDate>
+        <SequenceNumber>2</SequenceNumber>
+      </ReleaseDetailsByTerritory>
+    </Release>
+
+    <!-- ─── Track release 3: Sleep Sounds Vol 1 ────────────── -->
+    <Release>
+      <ReleaseReference>R3</ReleaseReference>
+      <ReleaseType>TrackRelease</ReleaseType>
+      <ReleaseId>
+        <ICPN>0123456789015</ICPN>
+      </ReleaseId>
+      <ReferenceTitle>
+        <TitleText>Sleep Sounds Vol 1</TitleText>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A3</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="SecondaryResource">A4</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Nova Crest</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName>
+            <FullName>Nova Crest</FullName>
+          </PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <LabelName>Celestial Sound Group</LabelName>
+        <Title TitleType="FormalTitle">
+          <TitleText>Sleep Sounds Vol 1</TitleText>
+        </Title>
+        <PLine>
+          <Year>2026</Year>
+          <PLineText>℗ 2026 Celestial Sound Group</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>© 2026 Nova Crest / Celestial Sound Group</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Ambient</GenreText>
+        </Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <OriginalReleaseDate>2026-05-01</OriginalReleaseDate>
+        <ReleaseDate>2026-05-01</ReleaseDate>
+        <SequenceNumber>3</SequenceNumber>
+      </ReleaseDetailsByTerritory>
+    </Release>
+
+  </ReleaseList>
+
+  <!-- ═══════════════════════════════════════════════════════
+       DEAL LIST
+       ═══════════════════════════════════════════════════════ -->
+  <DealList>
+    <ReleaseDeal>
+      <DealReleaseReference>R0</DealReleaseReference>
+      <DealReleaseReference>R1</DealReleaseReference>
+      <DealReleaseReference>R2</DealReleaseReference>
+      <DealReleaseReference>R3</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <CommercialModelType>SubscriptionModel</CommercialModelType>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <Usage>
+            <UseType>PermanentDownload</UseType>
+          </Usage>
+          <TerritoryCode>Worldwide</TerritoryCode>
+          <ValidityPeriod>
+            <StartDate>2026-05-01</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+    </ReleaseDeal>
+  </DealList>
+
+</ern:NewReleaseMessage>

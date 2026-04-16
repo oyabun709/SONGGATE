@@ -2,6 +2,7 @@
 Scan management endpoints.
 
 POST  /releases/{release_id}/scan                        — create + run a new scan
+GET   /scans                                             — all scans for this org (pipeline view)
 GET   /releases/{release_id}/scans                       — scan history for a release
 GET   /scans/{scan_id}                                   — single scan detail
 GET   /scans/{scan_id}/results                           — full ScanResult corpus
@@ -13,11 +14,15 @@ POST  /scans/{scan_id}/report/regenerate                 — re-trigger report g
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+import io
+import re
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -98,19 +103,13 @@ async def create_scan(
     await db.commit()
     await db.refresh(scan)
 
-    # Run the orchestrator in the background so we can return 202 immediately
-    scan_id = str(scan.id)
-    org_id = str(org.id)
-    dsps = payload.dsps
-    layers = payload.layers
-
     background_tasks.add_task(
         _run_scan_background,
         release_id=release_id,
-        scan_id=scan_id,
-        org_id=org_id,
-        dsps=dsps,
-        layers=layers,
+        scan_id=str(scan.id),
+        org_id=str(org.id),
+        dsps=payload.dsps,
+        layers=payload.layers,
     )
 
     return scan
@@ -138,6 +137,42 @@ async def _run_scan_background(
         logging.getLogger(__name__).exception(
             "Background scan failed for scan %s", scan_id
         )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GET /scans — all scans for this org (pipeline view), newest first
+# ──────────────────────────────────────────────────────────────────────────────
+
+class ScanWithRelease(ScanHistoryRead):
+    release_title: str = ""
+    release_artist: str = ""
+
+
+@router.get("/scans", response_model=list[ScanWithRelease])
+async def list_org_scans(
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Return recent scans across all releases for the org, newest first."""
+    rows = await db.execute(
+        text("""
+            SELECT
+                s.id, s.release_id, s.org_id, s.status, s.readiness_score,
+                s.grade, s.total_issues, s.critical_count, s.warning_count,
+                s.info_count, s.layers_run, s.started_at, s.completed_at,
+                s.created_at,
+                r.title AS release_title,
+                r.artist AS release_artist
+            FROM scans s
+            JOIN releases r ON r.id = s.release_id
+            WHERE s.org_id = :org_id
+            ORDER BY s.created_at DESC
+            LIMIT :limit
+        """),
+        {"org_id": str(org.id), "limit": limit},
+    )
+    return [ScanWithRelease.model_validate(dict(row)) for row in rows.mappings().all()]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -173,6 +208,138 @@ async def list_scans_for_release(
         .order_by(Scan.created_at.desc())
     )
     return list(scans_result.scalars().all())
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GET /scans/stats — dashboard summary (Clerk JWT auth)
+# MUST be defined before /scans/{scan_id} so "stats" isn't consumed as a path param
+# ──────────────────────────────────────────────────────────────────────────────
+
+class TopIssueOut(BaseModel):
+    rule_id: str
+    layer: str
+    severity: str
+    count: int
+
+
+class TrendPoint(BaseModel):
+    date: str       # "Apr 15"
+    critical: int
+    warning: int
+    info: int
+
+
+class DashboardStats(BaseModel):
+    critical_issues: int
+    scans_this_month: int
+    top_issues: list[TopIssueOut]
+    trend: list[TrendPoint]   # 30 days, oldest → newest
+
+
+@router.get("/scans/stats", response_model=DashboardStats)
+async def get_dashboard_stats(
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+):
+    """
+    Dashboard summary for the org: top issues, 30-day severity trend,
+    critical issue count, and scans-this-month count.
+    All data scoped to the authenticated org.
+    """
+    org_id = org.id
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = now - timedelta(days=29)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # ── Top 5 issues (all time, non-pass results) ─────────────────────────────
+    top_rows = await db.execute(
+        text("""
+            SELECT sr.rule_id, sr.layer, sr.severity, COUNT(*) AS cnt
+            FROM scan_results sr
+            JOIN scans s ON s.id = sr.scan_id
+            WHERE s.org_id = :org_id
+              AND sr.status != 'pass'
+              AND sr.severity IN ('critical', 'warning')
+            GROUP BY sr.rule_id, sr.layer, sr.severity
+            ORDER BY cnt DESC
+            LIMIT 5
+        """),
+        {"org_id": str(org_id)},
+    )
+    top_issues = [
+        TopIssueOut(rule_id=r.rule_id, layer=r.layer, severity=r.severity, count=r.cnt)
+        for r in top_rows.fetchall()
+    ]
+
+    # ── 30-day daily severity trend ───────────────────────────────────────────
+    trend_rows = await db.execute(
+        text("""
+            SELECT
+                DATE(sr.created_at AT TIME ZONE 'UTC') AS day,
+                SUM(CASE WHEN sr.severity = 'critical' THEN 1 ELSE 0 END) AS critical,
+                SUM(CASE WHEN sr.severity = 'warning'  THEN 1 ELSE 0 END) AS warning,
+                SUM(CASE WHEN sr.severity = 'info'     THEN 1 ELSE 0 END) AS info
+            FROM scan_results sr
+            JOIN scans s ON s.id = sr.scan_id
+            WHERE s.org_id = :org_id
+              AND sr.created_at >= :since
+            GROUP BY DATE(sr.created_at AT TIME ZONE 'UTC')
+            ORDER BY day ASC
+        """),
+        {"org_id": str(org_id), "since": thirty_days_ago},
+    )
+    # Build a dense 30-day series (fill missing days with zeros)
+    trend_map: dict[str, dict] = {}
+    for row in trend_rows.fetchall():
+        key = row.day.strftime("%Y-%m-%d")
+        trend_map[key] = {
+            "critical": int(row.critical),
+            "warning": int(row.warning),
+            "info": int(row.info),
+        }
+    trend: list[TrendPoint] = []
+    for offset in range(30):
+        day = (thirty_days_ago + timedelta(days=offset)).date()
+        key = day.strftime("%Y-%m-%d")
+        counts = trend_map.get(key, {"critical": 0, "warning": 0, "info": 0})
+        trend.append(TrendPoint(
+            date=day.strftime("%-m/%-d"),
+            **counts,
+        ))
+
+    # ── Critical issues count (open, unresolved) ──────────────────────────────
+    crit_row = await db.execute(
+        text("""
+            SELECT COUNT(*) AS cnt
+            FROM scan_results sr
+            JOIN scans s ON s.id = sr.scan_id
+            WHERE s.org_id = :org_id
+              AND sr.severity = 'critical'
+              AND sr.resolved = FALSE
+              AND sr.status != 'pass'
+        """),
+        {"org_id": str(org_id)},
+    )
+    critical_issues = crit_row.scalar() or 0
+
+    # ── Scans this calendar month ─────────────────────────────────────────────
+    month_row = await db.execute(
+        text("""
+            SELECT COUNT(*) AS cnt
+            FROM scans
+            WHERE org_id = :org_id
+              AND created_at >= :month_start
+        """),
+        {"org_id": str(org_id), "month_start": month_start},
+    )
+    scans_this_month = month_row.scalar() or 0
+
+    return DashboardStats(
+        critical_issues=critical_issues,
+        scans_this_month=scans_this_month,
+        top_issues=top_issues,
+        trend=trend,
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -293,25 +460,24 @@ async def resolve_scan_result(
 # GET /scans/{scan_id}/report
 # ──────────────────────────────────────────────────────────────────────────────
 
-class ReportURLResponse(BaseModel):
-    scan_id: str
-    report_url: str                   # presigned S3 GET URL (valid 1 hour)
-    report_generated_at: datetime | None
-    filename: str
-
-
-@router.get("/scans/{scan_id}/report", response_model=ReportURLResponse)
+@router.get("/scans/{scan_id}/report")
 async def get_scan_report(
     scan_id: str,
     db: AsyncSession = Depends(get_db),
     org: Organization = Depends(get_current_org),
 ):
     """
-    Return a presigned S3 download URL for the scan's PDF report.
+    Generate and stream a PDF report for the scan on-demand.
 
-    If the report has not been generated yet, fires the generation task
-    and returns 202 Accepted so the client can poll.
+    Returns the PDF bytes directly as application/pdf with a Content-Disposition
+    attachment header — no S3 or Celery required.
     """
+    from models.release import Release
+    from models.scan_result import ScanResult
+    from services.reports.generator import ReportData, ReportGenerator, ReportIssue, ReportSuggestion
+    from services.scan_orchestrator import calculate_readiness_score
+    from services.audio.thresholds import DSP_THRESHOLDS
+
     scan = await _get_scan_for_org(db, scan_id, org.id)
     if not scan:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Scan not found")
@@ -319,30 +485,102 @@ async def get_scan_report(
     if scan.status != "complete":
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            detail="Scan is not yet complete — report will be available after the scan finishes.",
+            detail="Scan is not yet complete.",
         )
 
-    # Report not generated yet — fire the task and tell the client to retry
-    if not scan.report_url:
-        try:
-            from tasks.generate_report import generate_report_task
-            generate_report_task.delay(scan_id)
-        except Exception:
-            pass
-        raise HTTPException(
-            status.HTTP_202_ACCEPTED,
-            detail="Report generation started — retry in a few seconds.",
+    # Fetch release
+    release_result = await db.execute(
+        select(Release).where(Release.id == scan.release_id)
+    )
+    release = release_result.scalar_one_or_none()
+    if not release:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Release not found")
+
+    # Fetch all scan results
+    results_query = await db.execute(
+        select(ScanResult)
+        .where(ScanResult.scan_id == uuid.UUID(scan_id))
+        .order_by(ScanResult.severity, ScanResult.layer)
+    )
+    all_results = list(results_query.scalars().all())
+
+    # Build issues + suggestions
+    issues: list[ReportIssue] = []
+    suggestions: list[ReportSuggestion] = []
+    for r in all_results:
+        if r.status == "pass":
+            continue
+        if r.layer == "enrichment":
+            meta = r.metadata_ or {}
+            suggestions.append(ReportSuggestion(
+                field=r.rule_id.rsplit(".", 1)[-1],
+                message=r.message,
+                fix_hint=r.fix_hint,
+                confidence=meta.get("confidence", "medium"),
+                source_url=meta.get("source_url", ""),
+            ))
+        else:
+            issues.append(ReportIssue(
+                rule_id=r.rule_id,
+                layer=r.layer,
+                severity=r.severity,
+                message=r.message,
+                fix_hint=r.fix_hint,
+                actual_value=r.actual_value,
+                field_path=r.field_path,
+                dsp_targets=list(r.dsp_targets or []),
+                resolved=r.resolved,
+            ))
+
+    # Per-layer scores
+    layer_order = ["ddex", "metadata", "fraud", "audio", "artwork", "enrichment"]
+    layer_scores: dict[str, float] = {}
+    for layer in layer_order:
+        layer_issues = [r for r in all_results if r.layer == layer]
+        layer_scores[layer] = calculate_readiness_score(layer_issues)["readiness_score"] if layer_issues else 100.0
+
+    # DSP readiness
+    dsp_readiness: dict[str, str] = {}
+    for dsp_slug in DSP_THRESHOLDS.keys():
+        has_blocking = any(
+            r.severity == "critical" and not r.resolved and dsp_slug in (r.dsp_targets or [])
+            for r in all_results
         )
+        dsp_readiness[dsp_slug] = "issues" if has_blocking else "ready"
+    if any(r.severity == "critical" and not r.resolved and not r.dsp_targets for r in all_results):
+        for dsp_slug in dsp_readiness:
+            dsp_readiness[dsp_slug] = "issues"
 
-    # Generate a presigned GET URL from the stored S3 key
-    presigned_url = _make_presigned_url(scan.report_url)
-    filename = scan.report_url.rsplit("/", 1)[-1]
-
-    return ReportURLResponse(
+    md = release.metadata_ or {}
+    report_data = ReportData(
+        release_title=release.title,
+        release_artist=release.artist,
+        release_upc=release.upc,
+        release_date=str(release.release_date) if release.release_date else None,
         scan_id=scan_id,
-        report_url=presigned_url,
-        report_generated_at=scan.report_generated_at,
-        filename=filename,
+        scan_date=scan.completed_at or scan.created_at,
+        org_name=md.get("org_name", ""),
+        readiness_score=scan.readiness_score or 0.0,
+        grade=scan.grade.value if scan.grade else "FAIL",
+        critical_count=scan.critical_count,
+        warning_count=scan.warning_count,
+        info_count=scan.info_count,
+        layer_scores=layer_scores,
+        dsp_readiness=dsp_readiness,
+        issues=issues,
+        suggestions=suggestions,
+    )
+
+    pdf_bytes = ReportGenerator().build(report_data)
+
+    safe_title = re.sub(r"[^\w\-]", "_", release.title)[:60]
+    date_str = (scan.completed_at or scan.created_at).strftime("%Y-%m-%d")
+    filename = f"SONGGATE_{safe_title}_{date_str}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -356,36 +594,60 @@ async def regenerate_report(
     db: AsyncSession = Depends(get_db),
     org: Organization = Depends(get_current_org),
 ):
-    """Re-trigger PDF generation (e.g. after resolving issues)."""
+    """Alias — report is generated on-demand, so this is a no-op that returns 202."""
     scan = await _get_scan_for_org(db, scan_id, org.id)
     if not scan:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Scan not found")
     if scan.status != "complete":
         raise HTTPException(status.HTTP_409_CONFLICT, detail="Scan is not complete.")
-
-    from tasks.generate_report import generate_report_task
-    generate_report_task.delay(scan_id)
-    return {"detail": "Report generation queued.", "scan_id": scan_id}
+    return {"detail": "Use GET /scans/{scan_id}/report to download the PDF.", "scan_id": scan_id}
 
 
-def _make_presigned_url(s3_key: str, expires_in: int = 3600) -> str:
-    """Generate a presigned S3 GET URL for a stored report key."""
-    from config import settings
+# ──────────────────────────────────────────────────────────────────────────────
+# GET /analytics/overview — full analytics payload, Clerk JWT auth, no tier gate
+# ──────────────────────────────────────────────────────────────────────────────
 
-    kwargs: dict = {"region_name": settings.aws_region}
-    if settings.aws_access_key_id:
-        kwargs["aws_access_key_id"] = settings.aws_access_key_id
-        kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
-    if settings.s3_endpoint_url:
-        kwargs["endpoint_url"] = settings.s3_endpoint_url
+@router.get("/analytics/overview")
+async def get_analytics_overview(
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+):
+    """
+    Same data as /api/v1/analytics/overview but authenticated with a Clerk
+    session token rather than an API key, and with no Enterprise tier gate.
+    Used by the internal dashboard.
+    """
+    from routers.public_api import _compute_analytics_overview
+    return await _compute_analytics_overview(db, org.id)
 
-    import boto3
-    s3 = boto3.client("s3", **kwargs)
-    return s3.generate_presigned_url(
-        "get_object",
-        Params={"Bucket": settings.s3_bucket, "Key": s3_key},
-        ExpiresIn=expires_in,
-    )
+
+@router.post("/analytics/overview/refresh")
+async def refresh_analytics_overview(
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+):
+    from routers.public_api import _compute_analytics_overview
+    return await _compute_analytics_overview(db, org.id)
+
+
+@router.post("/analytics/share", status_code=201)
+async def create_share_link_clerk(
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+):
+    """Create a public share link using Clerk JWT auth (same as /api/v1/analytics/share)."""
+    from routers.public_api import _compute_analytics_overview, _sanitize_overview, _share_token_upsert, _SHARE_TTL
+    import secrets
+    import json
+    from datetime import timedelta
+
+    overview = await _compute_analytics_overview(db, org.id)
+    token = secrets.token_urlsafe(24)
+    sanitized = _sanitize_overview(overview)
+    serialized = json.dumps(sanitized)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=_SHARE_TTL)
+    await _share_token_upsert(db, token, serialized, expires_at)
+    return {"token": token, "expires_at": expires_at}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

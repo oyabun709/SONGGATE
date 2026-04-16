@@ -719,6 +719,7 @@ async def upload_ddex(
     # ── Parse DDEX to extract title / artist ───────────────────────────────
     title = "Unknown Release"
     artist = "Unknown Artist"
+    parsed: dict = {}
     try:
         parsed = DDEXParser().extract_metadata(content)
         if parsed.get("title"):
@@ -728,31 +729,37 @@ async def upload_ddex(
     except Exception:
         pass  # fall back to defaults; validator will catch any structural issues
 
-    # ── Upload XML to S3 ───────────────────────────────────────────────────
-    safe_name = _re.sub(r"[^\w.\-]", "_", file.filename or "release.xml")
-    s3_key = f"ropqa/{org.id}/releases/ddex-uploads/{uuid.uuid4()}/{safe_name}"
+    # ── Upload XML to S3 (or fall back to inline data URI when S3 is unconfigured) ──
+    import base64 as _b64
 
-    s3_kwargs: dict = {"region_name": settings.aws_region}
-    if settings.aws_access_key_id:
-        s3_kwargs["aws_access_key_id"] = settings.aws_access_key_id
-        s3_kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
-    if settings.s3_endpoint_url:
-        s3_kwargs["endpoint_url"] = settings.s3_endpoint_url
+    if settings.aws_access_key_id or settings.s3_endpoint_url:
+        safe_name = _re.sub(r"[^\w.\-]", "_", file.filename or "release.xml")
+        s3_key = f"ropqa/{org.id}/releases/ddex-uploads/{uuid.uuid4()}/{safe_name}"
 
-    s3 = boto3.client("s3", **s3_kwargs)
-    s3.put_object(
-        Bucket=settings.s3_bucket,
-        Key=s3_key,
-        Body=content,
-        ContentType="application/xml",
-    )
+        s3_kwargs: dict = {"region_name": settings.aws_region}
+        if settings.aws_access_key_id:
+            s3_kwargs["aws_access_key_id"] = settings.aws_access_key_id
+            s3_kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
+        if settings.s3_endpoint_url:
+            s3_kwargs["endpoint_url"] = settings.s3_endpoint_url
 
-    # Store the container-accessible URL so the worker can download it
-    raw_package_url = (
-        f"{settings.s3_endpoint_url}/{settings.s3_bucket}/{s3_key}"
-        if settings.s3_endpoint_url
-        else f"s3://{settings.s3_bucket}/{s3_key}"
-    )
+        s3 = boto3.client("s3", **s3_kwargs)
+        s3.put_object(
+            Bucket=settings.s3_bucket,
+            Key=s3_key,
+            Body=content,
+            ContentType="application/xml",
+        )
+        raw_package_url = (
+            f"{settings.s3_endpoint_url}/{settings.s3_bucket}/{s3_key}"
+            if settings.s3_endpoint_url
+            else f"s3://{settings.s3_bucket}/{s3_key}"
+        )
+    else:
+        # No S3 configured — store content inline as a data URI.
+        # The scan orchestrator's _download_artifact handles the data: scheme.
+        encoded = _b64.b64encode(content).decode()
+        raw_package_url = f"data:application/xml;base64,{encoded}"
 
     # ── Create release row ─────────────────────────────────────────────────
     release = Release(
@@ -768,6 +775,21 @@ async def upload_ddex(
     )
     db.add(release)
     await db.flush()
+
+    # Create Track rows from parsed DDEX so per-track endpoints work immediately
+    from models.track import Track as TrackModel
+    for idx, t in enumerate(parsed.get("tracks", []) if isinstance(parsed, dict) else [], start=1):
+        raw_isrc = t.get("isrc") or None
+        # Normalize ISRC: strip hyphens so "US-PR1-26-00001" → "USPR1260001" (12 chars max)
+        isrc = raw_isrc.replace("-", "")[:12] if raw_isrc else None
+        db.add(TrackModel(
+            id=uuid.uuid4(),
+            release_id=release.id,
+            isrc=isrc,
+            title=t.get("title") or "Unknown",
+            track_number=idx,
+            duration_ms=t.get("duration_ms"),
+        ))
 
     scan_out: Scan | None = None
     if trigger_scan:
@@ -795,6 +817,169 @@ async def upload_ddex(
     return PublicReleaseWithScan(
         release=PublicReleaseOut.model_validate(release),
         scan=PublicScanOut.model_validate(scan_out) if scan_out else None,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# POST /releases/{release_id}/artwork   — upload cover art
+# ──────────────────────────────────────────────────────────────────────────────
+
+class ArtworkUploadOut(BaseModel):
+    release_id: str
+    artwork_width: int
+    artwork_height: int
+    message: str
+
+
+@router.post(
+    "/releases/{release_id}/artwork",
+    response_model=ArtworkUploadOut,
+    summary="Upload cover artwork",
+    description=(
+        "Upload a JPEG or PNG cover image for the release. The image is stored inline "
+        "and will be validated against all DSP artwork requirements during the next scan. "
+        "Minimum 3000×3000 px required by all major DSPs."
+    ),
+)
+async def upload_artwork(
+    release_id: uuid.UUID,
+    org: OrgDep,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(..., description="JPEG or PNG cover image"),
+) -> ArtworkUploadOut:
+    import base64 as _b64
+    from PIL import Image as _Image
+    import io as _io
+
+    release = await _get_release_for_org(db, release_id, org.id)
+
+    content = await file.read()
+    if len(content) > 15 * 1024 * 1024:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Artwork must be under 15 MB.")
+
+    # Validate it's a real image and get dimensions
+    try:
+        img = _Image.open(_io.BytesIO(content))
+        img.verify()
+        img = _Image.open(_io.BytesIO(content))  # re-open after verify
+        width, height = img.size
+        fmt = img.format or "JPEG"
+    except Exception as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Invalid image file: {exc}")
+
+    mime = "image/png" if fmt.upper() == "PNG" else "image/jpeg"
+    encoded = _b64.b64encode(content).decode()
+    data_uri = f"data:{mime};base64,{encoded}"
+
+    existing = dict(release.metadata_ or {})
+    existing["artwork_url"] = data_uri
+    existing["artwork_width"] = width
+    existing["artwork_height"] = height
+    release.metadata_ = existing
+    await db.commit()
+
+    return ArtworkUploadOut(
+        release_id=str(release_id),
+        artwork_width=width,
+        artwork_height=height,
+        message=f"Artwork uploaded ({width}×{height} px). Run a scan to validate DSP requirements.",
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GET  /releases/{release_id}/tracks                       — list tracks
+# POST /releases/{release_id}/tracks/{track_id}/audio-url  — set audio URL
+# ──────────────────────────────────────────────────────────────────────────────
+
+class TrackOut(BaseModel):
+    id: str
+    title: str
+    isrc: str | None
+    track_number: int | None
+    duration_ms: int | None
+    audio_url: str | None
+
+
+@router.get(
+    "/releases/{release_id}/tracks",
+    response_model=list[TrackOut],
+    summary="List tracks",
+    description="Return all tracks for a release with their IDs (needed to set audio URLs).",
+)
+async def list_tracks(
+    release_id: uuid.UUID,
+    org: OrgDep,
+    db: AsyncSession = Depends(get_db),
+) -> list[TrackOut]:
+    from models.track import Track as TrackModel
+
+    await _get_release_for_org(db, release_id, org.id)
+
+    result = await db.execute(
+        select(TrackModel)
+        .where(TrackModel.release_id == release_id)
+        .order_by(TrackModel.track_number)
+    )
+    tracks = list(result.scalars().all())
+    return [
+        TrackOut(
+            id=str(t.id),
+            title=t.title,
+            isrc=t.isrc,
+            track_number=t.track_number,
+            duration_ms=t.duration_ms,
+            audio_url=t.audio_url,
+        )
+        for t in tracks
+    ]
+
+
+class AudioUrlIn(BaseModel):
+    audio_url: str = Field(..., description="Publicly accessible URL to the audio file (FLAC, WAV, MP3).")
+
+
+class AudioUrlOut(BaseModel):
+    track_id: str
+    audio_url: str
+    message: str
+
+
+@router.post(
+    "/releases/{release_id}/tracks/{track_id}/audio-url",
+    response_model=AudioUrlOut,
+    summary="Set track audio URL",
+    description=(
+        "Provide a publicly accessible URL to an audio file for a track. "
+        "The URL will be used during the next scan to validate loudness (LUFS), "
+        "duration, codec, and sample-rate requirements per DSP."
+    ),
+)
+async def set_track_audio_url(
+    release_id: uuid.UUID,
+    track_id: uuid.UUID,
+    body: AudioUrlIn,
+    org: OrgDep,
+    db: AsyncSession = Depends(get_db),
+) -> AudioUrlOut:
+    from models.track import Track
+
+    # Verify release ownership
+    await _get_release_for_org(db, release_id, org.id)
+
+    track_result = await db.execute(
+        select(Track).where(Track.id == track_id, Track.release_id == release_id)
+    )
+    track = track_result.scalar_one_or_none()
+    if not track:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Track not found for this release.")
+
+    track.audio_url = body.audio_url
+    await db.commit()
+
+    return AudioUrlOut(
+        track_id=str(track_id),
+        audio_url=body.audio_url,
+        message="Audio URL set. Run a scan to validate loudness and format requirements.",
     )
 
 
@@ -1032,20 +1217,27 @@ async def get_scan_results(
 
 @router.get(
     "/scans/{scan_id}/report",
-    response_model=ReportURLOut,
-    summary="Get PDF report URL",
+    summary="Download PDF report",
     description=(
-        "Return a presigned S3 download URL for the scan's QA report PDF. "
-        "The URL is valid for **1 hour**. "
-        "If the report hasn't been generated yet, the endpoint fires generation "
-        "and returns **202 Accepted** — retry after a few seconds."
+        "Generate and stream a PDF QA report for the completed scan. "
+        "Returns application/pdf bytes directly — no S3 or storage required."
     ),
 )
 async def get_scan_report(
     scan_id: uuid.UUID,
     org: OrgDep,
     db: AsyncSession = Depends(get_db),
-) -> ReportURLOut:
+):
+    import io
+    import re as _re
+    from sqlalchemy import select as _select
+    from fastapi.responses import StreamingResponse
+    from models.scan_result import ScanResult as ScanResultModel, ResultStatus as RS
+    from services.reports.generator import ReportData, ReportGenerator, ReportIssue, ReportSuggestion
+    from services.scan_orchestrator import calculate_readiness_score
+    from services.audio.thresholds import DSP_THRESHOLDS
+    from models.release import Release as ReleaseModel
+
     scan = await _get_scan_for_org(db, scan_id, org.id)
 
     if scan.status != ScanStatus.complete:
@@ -1054,24 +1246,91 @@ async def get_scan_report(
             detail="Scan is not yet complete — report available after scan finishes.",
         )
 
-    if not scan.report_url:
-        try:
-            from tasks.generate_report import generate_report_task
-            generate_report_task.delay(str(scan_id))
-        except Exception:
-            pass
-        raise HTTPException(
-            status.HTTP_202_ACCEPTED,
-            detail="Report generation started — retry in a few seconds.",
-        )
+    release_res = await db.execute(_select(ReleaseModel).where(ReleaseModel.id == scan.release_id))
+    release = release_res.scalar_one_or_none()
+    if not release:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Release not found")
 
-    presigned_url = _make_presigned_url(scan.report_url)
-    filename = scan.report_url.rsplit("/", 1)[-1]
-    return ReportURLOut(
+    results_res = await db.execute(
+        _select(ScanResultModel)
+        .where(ScanResultModel.scan_id == scan_id)
+        .order_by(ScanResultModel.severity, ScanResultModel.layer)
+    )
+    all_results = list(results_res.scalars().all())
+
+    issues: list[ReportIssue] = []
+    suggestions: list[ReportSuggestion] = []
+    for r in all_results:
+        if r.status == "pass":
+            continue
+        if r.layer == "enrichment":
+            meta = r.metadata_ or {}
+            suggestions.append(ReportSuggestion(
+                field=r.rule_id.rsplit(".", 1)[-1],
+                message=r.message,
+                fix_hint=r.fix_hint,
+                confidence=meta.get("confidence", "medium"),
+                source_url=meta.get("source_url", ""),
+            ))
+        else:
+            issues.append(ReportIssue(
+                rule_id=r.rule_id,
+                layer=r.layer,
+                severity=r.severity,
+                message=r.message,
+                fix_hint=r.fix_hint,
+                actual_value=r.actual_value,
+                field_path=r.field_path,
+                dsp_targets=list(r.dsp_targets or []),
+                resolved=r.resolved,
+            ))
+
+    layer_order = ["ddex", "metadata", "fraud", "audio", "artwork", "enrichment"]
+    layer_scores: dict[str, float] = {}
+    for layer in layer_order:
+        layer_issues = [r for r in all_results if r.layer == layer]
+        layer_scores[layer] = calculate_readiness_score(layer_issues)["readiness_score"] if layer_issues else 100.0
+
+    dsp_readiness: dict[str, str] = {}
+    for dsp_slug in DSP_THRESHOLDS.keys():
+        has_blocking = any(
+            r.severity == "critical" and not r.resolved and dsp_slug in (r.dsp_targets or [])
+            for r in all_results
+        )
+        dsp_readiness[dsp_slug] = "issues" if has_blocking else "ready"
+    if any(r.severity == "critical" and not r.resolved and not r.dsp_targets for r in all_results):
+        for dsp_slug in dsp_readiness:
+            dsp_readiness[dsp_slug] = "issues"
+
+    md = release.metadata_ or {}
+    report_data = ReportData(
+        release_title=release.title,
+        release_artist=release.artist,
+        release_upc=release.upc,
+        release_date=str(release.release_date) if release.release_date else None,
         scan_id=str(scan_id),
-        report_url=presigned_url,
-        report_generated_at=scan.report_generated_at,
-        filename=filename,
+        scan_date=scan.completed_at or scan.created_at,
+        org_name=md.get("org_name", ""),
+        readiness_score=scan.readiness_score or 0.0,
+        grade=scan.grade.value if scan.grade else "FAIL",
+        critical_count=scan.critical_count,
+        warning_count=scan.warning_count,
+        info_count=scan.info_count,
+        layer_scores=layer_scores,
+        dsp_readiness=dsp_readiness,
+        issues=issues,
+        suggestions=suggestions,
+    )
+
+    pdf_bytes = ReportGenerator().build(report_data)
+    safe_title = _re.sub(r"[^\w\-]", "_", release.title)[:60]
+    date_str = (scan.completed_at or scan.created_at).strftime("%Y-%m-%d")
+    filename = f"SONGGATE_{safe_title}_{date_str}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -1618,13 +1877,16 @@ async def analytics_overview(
     cache_key = f"analytics:overview:{org.id}"
     redis = await _get_redis()
 
-    cached = await redis.get(cache_key)
-    if cached:
-        data = json.loads(cached)
-        return AnalyticsOverview.model_validate(data)
+    if redis is not None:
+        cached = await redis.get(cache_key)
+        if cached:
+            return AnalyticsOverview.model_validate(json.loads(cached))
 
     overview = await _compute_analytics_overview(db, org.id)
-    await redis.setex(cache_key, _OVERVIEW_TTL, overview.model_dump_json())
+
+    if redis is not None:
+        await redis.setex(cache_key, _OVERVIEW_TTL, overview.model_dump_json())
+
     return overview
 
 
@@ -1646,7 +1908,8 @@ async def analytics_overview_refresh(
     cache_key = f"analytics:overview:{org.id}"
     redis = await _get_redis()
     overview = await _compute_analytics_overview(db, org.id)
-    await redis.setex(cache_key, _OVERVIEW_TTL, overview.model_dump_json())
+    if redis is not None:
+        await redis.setex(cache_key, _OVERVIEW_TTL, overview.model_dump_json())
     return overview
 
 
@@ -1672,19 +1935,27 @@ async def create_share_link(
     cache_key = f"analytics:overview:{org.id}"
     redis = await _get_redis()
 
-    cached = await redis.get(cache_key)
-    if cached:
-        overview = AnalyticsOverview.model_validate(json.loads(cached))
+    if redis is not None:
+        cached = await redis.get(cache_key)
+        if cached:
+            overview = AnalyticsOverview.model_validate(json.loads(cached))
+        else:
+            overview = await _compute_analytics_overview(db, org.id)
+            await redis.setex(cache_key, _OVERVIEW_TTL, overview.model_dump_json())
     else:
         overview = await _compute_analytics_overview(db, org.id)
-        await redis.setex(cache_key, _OVERVIEW_TTL, overview.model_dump_json())
 
     token = secrets.token_urlsafe(24)
-    share_key = f"analytics:share:{token}"
     sanitized = _sanitize_overview(overview)
-    await redis.setex(share_key, _SHARE_TTL, json.dumps(sanitized))
-
+    serialized = json.dumps(sanitized)
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=_SHARE_TTL)
+
+    if redis is not None:
+        share_key = f"analytics:share:{token}"
+        await redis.setex(share_key, _SHARE_TTL, serialized)
+    else:
+        await _share_token_upsert(db, token, serialized, expires_at)
+
     return ShareTokenOut(token=token, expires_at=expires_at)
 
 
@@ -1699,10 +1970,16 @@ async def create_share_link(
     ),
     # Exclude from the authenticated tag group so it appears separately in /docs
 )
-async def get_shared_analytics(token: str) -> AnalyticsOverview:
+async def get_shared_analytics(token: str, db: AsyncSession = Depends(get_db)) -> AnalyticsOverview:
     redis = await _get_redis()
-    share_key = f"analytics:share:{token}"
-    data = await redis.get(share_key)
+    data: str | None = None
+
+    if redis is not None:
+        share_key = f"analytics:share:{token}"
+        data = await redis.get(share_key)
+    else:
+        data = await _share_token_lookup(db, token)
+
     if not data:
         raise HTTPException(
             status.HTTP_404_NOT_FOUND,
@@ -1712,19 +1989,71 @@ async def get_shared_analytics(token: str) -> AnalyticsOverview:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Redis helper
+# Analytics share token — DB fallback when Redis is unavailable
+# ─────────────────────────────────────────────────────────────────────────────
+
+_share_table_ensured: bool = False
+
+
+async def _ensure_share_table(db: AsyncSession) -> None:
+    global _share_table_ensured
+    if _share_table_ensured:
+        return
+    await db.execute(text("""
+        CREATE TABLE IF NOT EXISTS analytics_share_tokens (
+            token      TEXT PRIMARY KEY,
+            data       TEXT NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL
+        )
+    """))
+    await db.commit()
+    _share_table_ensured = True
+
+
+async def _share_token_upsert(db: AsyncSession, token: str, data: str, expires_at: datetime) -> None:
+    await _ensure_share_table(db)
+    await db.execute(text("""
+        INSERT INTO analytics_share_tokens (token, data, expires_at)
+        VALUES (:token, :data, :expires_at)
+        ON CONFLICT (token) DO UPDATE SET data = EXCLUDED.data, expires_at = EXCLUDED.expires_at
+    """), {"token": token, "data": data, "expires_at": expires_at})
+    await db.commit()
+
+
+async def _share_token_lookup(db: AsyncSession, token: str) -> str | None:
+    await _ensure_share_table(db)
+    row = (await db.execute(text("""
+        SELECT data FROM analytics_share_tokens
+        WHERE token = :token AND expires_at > now()
+    """), {"token": token})).fetchone()
+    return row[0] if row else None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Redis helper — optional, returns None when unavailable
 # ─────────────────────────────────────────────────────────────────────────────
 
 _redis_client: Any = None
+_redis_unavailable: bool = False
 
 
 async def _get_redis() -> Any:
-    global _redis_client
-    if _redis_client is None:
+    """Return an aioredis client, or None if Redis is not configured/reachable."""
+    global _redis_client, _redis_unavailable
+    if _redis_unavailable:
+        return None
+    if _redis_client is not None:
+        return _redis_client
+    try:
         import redis.asyncio as aioredis
         from config import settings
-        _redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
-    return _redis_client
+        client = aioredis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=2)
+        await client.ping()
+        _redis_client = client
+        return _redis_client
+    except Exception:
+        _redis_unavailable = True
+        return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

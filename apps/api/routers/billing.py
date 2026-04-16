@@ -178,6 +178,12 @@ async def checkout(
     org: Organization = Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
 ) -> SessionURLOut:
+    if not settings.stripe_secret_key:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Billing is not yet configured. Contact sales@songgate.io to upgrade your plan.",
+        )
+
     allowed_price_ids = {
         settings.stripe_starter_price_id,
         settings.stripe_pro_price_id,
@@ -210,6 +216,11 @@ async def portal(
     org: Organization = Depends(get_current_org),
     db: AsyncSession = Depends(get_db),
 ) -> SessionURLOut:
+    if not settings.stripe_secret_key:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Billing is not yet configured. Contact sales@songgate.io to upgrade your plan.",
+        )
     if not org.stripe_customer_id and not org.stripe_subscription_id:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,

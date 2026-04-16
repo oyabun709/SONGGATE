@@ -15,13 +15,10 @@ import {
   Sparkles,
   ShieldAlert,
   Loader2,
-  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   getScanResults,
-  getScanReport,
-  regenerateReport,
   resolveResult,
   type ScanDetail,
   type ScanResult,
@@ -267,7 +264,6 @@ export default function ScanResultsPage() {
   const [pollingFor, setPollingFor] = useState(true);
   const [token, setToken] = useState<string>("");
   const [reportLoading, setReportLoading] = useState(false);
-  const [reportPending, setReportPending] = useState(false);
 
   const fetchScan = useCallback(async (tok?: string) => {
     const t = tok ?? token;
@@ -315,36 +311,33 @@ export default function ScanResultsPage() {
 
   // ── Download report ──────────────────────────────────────────────────────
   async function handleDownloadReport() {
-    if (!token || !scan) return;
+    if (!token || !scan || scan.status !== "complete") return;
     setReportLoading(true);
-    setReportPending(false);
-
-    // Poll until report is ready (generation takes ~5–15 s)
-    for (let attempt = 0; attempt < 20; attempt++) {
-      try {
-        const report = await getScanReport(params.scanId, token);
-        // Trigger browser download via hidden anchor
-        const a = document.createElement("a");
-        a.href = report.report_url;
-        a.download = report.filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setReportLoading(false);
-        return;
-      } catch (err: unknown) {
-        // 202 = generation started, keep polling
-        if (err instanceof Error && err.message.includes("202")) {
-          setReportPending(true);
-          await new Promise((r) => setTimeout(r, 3000));
-          continue;
-        }
-        // Any other error: stop
-        break;
+    try {
+      const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      const res = await fetch(`${API}/scans/${params.scanId}/report`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail ?? "Failed to generate report");
       }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = res.headers.get("content-disposition") ?? "";
+      const match = cd.match(/filename="([^"]+)"/);
+      a.download = match?.[1] ?? `SONGGATE_scan_${params.scanId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      /* noop — button just stops spinning */
+    } finally {
+      setReportLoading(false);
     }
-    setReportLoading(false);
-    setReportPending(false);
   }
 
   if (loading) {
@@ -421,7 +414,7 @@ export default function ScanResultsPage() {
             {reportLoading ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {reportPending ? "Generating…" : "Downloading…"}
+                Generating…
               </>
             ) : (
               <>

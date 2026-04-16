@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -15,7 +16,29 @@ async def list_releases(
     db: AsyncSession = Depends(get_db),
     org: Organization = Depends(get_current_org),
 ):
-    return await ReleaseService(db).list_for_org(org.id)
+    rows = await db.execute(
+        text("""
+            SELECT
+                r.id, r.org_id, r.external_id, r.title, r.artist,
+                r.upc, r.release_date, r.submission_format,
+                r.raw_package_url, r.status, r.created_at,
+                s.id              AS latest_scan_id,
+                s.grade           AS latest_scan_grade,
+                s.readiness_score AS latest_scan_score
+            FROM releases r
+            LEFT JOIN LATERAL (
+                SELECT id, grade, readiness_score
+                FROM scans
+                WHERE release_id = r.id
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) s ON TRUE
+            WHERE r.org_id = :org_id
+            ORDER BY r.created_at DESC
+        """),
+        {"org_id": str(org.id)},
+    )
+    return [ReleaseRead.model_validate(dict(row)) for row in rows.mappings().all()]
 
 
 @router.get("/{release_id}", response_model=ReleaseRead)
@@ -24,10 +47,32 @@ async def get_release(
     db: AsyncSession = Depends(get_db),
     org: Organization = Depends(get_current_org),
 ):
-    release = await ReleaseService(db).get_for_org(release_id, org.id)
-    if not release:
+    rows = await db.execute(
+        text("""
+            SELECT
+                r.id, r.org_id, r.external_id, r.title, r.artist,
+                r.upc, r.release_date, r.submission_format,
+                r.raw_package_url, r.status, r.created_at,
+                s.id              AS latest_scan_id,
+                s.grade           AS latest_scan_grade,
+                s.readiness_score AS latest_scan_score
+            FROM releases r
+            LEFT JOIN LATERAL (
+                SELECT id, grade, readiness_score
+                FROM scans
+                WHERE release_id = r.id
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) s ON TRUE
+            WHERE r.id = :release_id
+              AND r.org_id = :org_id
+        """),
+        {"release_id": release_id, "org_id": str(org.id)},
+    )
+    row = rows.mappings().one_or_none()
+    if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Release not found")
-    return release
+    return ReleaseRead.model_validate(dict(row))
 
 
 @router.post("/", response_model=ReleaseRead, status_code=status.HTTP_201_CREATED)

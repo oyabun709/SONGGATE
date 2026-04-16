@@ -296,6 +296,13 @@ class DDEXParser:
         # Build isrc_list for the rules engine
         meta["isrc_list"] = [t["isrc"] for t in meta.get("tracks", []) if "isrc" in t]
 
+        # Aggregate top-level publisher from tracks (first track with has_publisher=True)
+        if not meta.get("publisher"):
+            for t in meta.get("tracks", []):
+                if t.get("has_publisher") and t.get("publisher"):
+                    meta["publisher"] = t["publisher"]
+                    break
+
         # DealList
         deal_list = _find(root, "DealList")
         if deal_list is not None:

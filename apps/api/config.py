@@ -1,4 +1,38 @@
+import re as _re
+from typing import ClassVar
+
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_SSL_MODES = {"require", "verify-ca", "verify-full", "allow", "prefer"}
+_STRIP_PARAMS = {"channel_binding", "sslmode", "ssl", "connect_timeout"}
+
+
+def _clean_asyncpg_url(url: str) -> tuple[str, bool]:
+    """Rewrite a postgresql:// URL to postgresql+asyncpg://, strip libpq-only
+    query params, and return (cleaned_url, ssl_required)."""
+    ssl_required = False
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            url = "postgresql+asyncpg://" + url[len(prefix):]
+            break
+
+    # Parse out query string
+    if "?" in url:
+        base, qs = url.split("?", 1)
+        kept_parts: list[str] = []
+        for part in qs.split("&"):
+            if not part:
+                continue
+            key, _, val = part.partition("=")
+            if key == "sslmode" and val in _SSL_MODES - {"disable"}:
+                ssl_required = True
+            elif key == "ssl" and val.lower() in ("true", "1", "require"):
+                ssl_required = True
+            elif key not in _STRIP_PARAMS:
+                kept_parts.append(part)
+        url = base + ("?" + "&".join(kept_parts) if kept_parts else "")
+    return url, ssl_required
 
 
 class Settings(BaseSettings):
@@ -6,6 +40,18 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+asyncpg://ropqa:ropqa@localhost:5432/ropqa"
+    database_url_requires_ssl: bool = False  # set automatically by validator
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_database_url(cls, data: dict) -> dict:
+        """Rewrite DATABASE_URL to asyncpg scheme and extract SSL requirement."""
+        url = data.get("database_url") or data.get("DATABASE_URL") or ""
+        if url:
+            cleaned, ssl = _clean_asyncpg_url(url)
+            data["database_url"] = cleaned
+            data.setdefault("database_url_requires_ssl", ssl)
+        return data
 
     # Redis / Celery
     redis_url: str = "redis://localhost:6379/0"
@@ -43,6 +89,10 @@ class Settings(BaseSettings):
     # Dev-only: admin bootstrap token for creating the first API key.
     # Set to empty string to disable.  Never expose in production.
     admin_token: str = "songgate-dev-admin"
+
+    # Comma-separated Clerk user IDs that have admin access.
+    # e.g. ADMIN_USER_IDS=user_abc123,user_xyz456
+    admin_user_ids: str = ""
 
 
 settings = Settings()

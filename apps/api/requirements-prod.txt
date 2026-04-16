@@ -1,0 +1,44 @@
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# Data validation
+pydantic>=2.9.0
+pydantic-settings>=2.6.0
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+alembic==1.14.0
+asyncpg==0.30.0
+psycopg2-binary==2.9.10
+
+# HTTP & parsing
+httpx==0.28.1
+lxml==5.3.0
+python-multipart==0.0.12
+
+# AWS / storage
+boto3==1.35.68
+
+# Auth
+python-jose[cryptography]==3.3.0
+svix==1.39.0
+
+# Artwork validation
+Pillow==10.4.0
+
+# MusicBrainz enrichment
+musicbrainzngs==0.7.1
+
+# PDF report generation
+reportlab>=4.0.0
+
+# Stripe billing
+stripe>=10.0.0
+
+# Fraud screening
+rapidfuzz==3.10.1
+
+# Seed / tooling
+pyyaml==6.0.2
+

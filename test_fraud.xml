@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DDEX ERN 4.3 NewReleaseMessage — FRAUD DETECTION TEST
+  Release:  Relaxing Sounds Collection Vol. 47
+  Artist:   Nature Sounds Factory
+
+  Intentional fraud signals:
+    - 5 tracks all under 60 seconds (classic streaming-fraud padding)
+    - Suspiciously generic "sleep/nature/relaxing" titles
+    - Duplicate ISRC across Track 2 and Track 4
+    - ICPN looks like a test/placeholder value
+-->
+<ern:NewReleaseMessage
+  xmlns:ern="http://ddex.net/xml/ern/43"
+  xmlns:avs="http://ddex.net/xml/avs/avs"
+  MessageSchemaVersionId="ern/43"
+  LanguageAndScriptCode="en">
+
+  <MessageHeader>
+    <MessageThreadId>MSG-2026-FRAUD-001</MessageThreadId>
+    <MessageId>MSG-2026-FRAUD-001-A</MessageId>
+    <MessageSender>
+      <PartyId>PADPIDAA33333333X</PartyId>
+      <PartyName><FullName>Sounds Factory LLC</FullName></PartyName>
+    </MessageSender>
+    <SentOnBehalfOf>
+      <PartyId>PADPIDAA44444444X</PartyId>
+      <PartyName><FullName>Nature Sounds Factory</FullName></PartyName>
+    </SentOnBehalfOf>
+    <MessageRecipient>
+      <PartyId>PADPIDAA99999999X</PartyId>
+      <PartyName><FullName>Digital Service Provider</FullName></PartyName>
+    </MessageRecipient>
+    <MessageCreatedDateTime>2026-04-15T09:00:00Z</MessageCreatedDateTime>
+    <MessageControlType>LiveMessage</MessageControlType>
+  </MessageHeader>
+
+  <PartyList>
+    <Party>
+      <PartyReference>P1</PartyReference>
+      <PartyId>IPI:00000009999</PartyId>
+      <PartyName><FullName>Nature Sounds Factory</FullName></PartyName>
+    </Party>
+    <Party>
+      <PartyReference>P2</PartyReference>
+      <PartyId>IPI:00000009998</PartyId>
+      <PartyName><FullName>Sounds Factory LLC</FullName></PartyName>
+    </Party>
+  </PartyList>
+
+  <ResourceList>
+
+    <!-- Track 1: Rain Sounds 1 — 45s (fraud: sub-60s) -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId><ISRC>US-SF1-26-00001</ISRC></SoundRecordingId>
+      <ResourceReference>A1</ResourceReference>
+      <ReferenceTitle><TitleText>Rain Sounds 1</TitleText></ReferenceTitle>
+      <Duration>PT45S</Duration>
+      <CreationDate>2026-03-01</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle"><TitleText>Rain Sounds 1</TitleText></Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName><FullName>Nature Sounds Factory</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayPublisher SequenceNumber="1">
+          <PartyReference>P2</PartyReference>
+          <PartyName><FullName>Sounds Factory LLC</FullName></PartyName>
+        </DisplayPublisher>
+        <PLine><Year>2026</Year><PLineText>℗ 2026 Sounds Factory LLC</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>© 2026 Sounds Factory LLC</CLineText></CLine>
+        <Genre><GenreText>Ambient</GenreText><SubGenre>Nature Sounds</SubGenre></Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T1</TechnicalResourceDetailsReference>
+          <AudioCodecType>MP3</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <File>
+            <FileName>rain_sounds_1.mp3</FileName>
+            <FilePath>audio/</FilePath>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Track 2: Sleep Noise White — 38s (fraud: sub-60s) -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <!-- FRAUD: duplicate ISRC — same code reused on Track 4 -->
+      <SoundRecordingId><ISRC>US-SF1-26-00002</ISRC></SoundRecordingId>
+      <ResourceReference>A2</ResourceReference>
+      <ReferenceTitle><TitleText>Sleep Noise White</TitleText></ReferenceTitle>
+      <Duration>PT38S</Duration>
+      <CreationDate>2026-03-01</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle"><TitleText>Sleep Noise White</TitleText></Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName><FullName>Nature Sounds Factory</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayPublisher SequenceNumber="1">
+          <PartyReference>P2</PartyReference>
+          <PartyName><FullName>Sounds Factory LLC</FullName></PartyName>
+        </DisplayPublisher>
+        <PLine><Year>2026</Year><PLineText>℗ 2026 Sounds Factory LLC</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>© 2026 Sounds Factory LLC</CLineText></CLine>
+        <Genre><GenreText>Ambient</GenreText></Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T2</TechnicalResourceDetailsReference>
+          <AudioCodecType>MP3</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <File><FileName>sleep_noise_white.mp3</FileName><FilePath>audio/</FilePath></File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Track 3: Nature Birds Loop — 52s (fraud: sub-60s) -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId><ISRC>US-SF1-26-00003</ISRC></SoundRecordingId>
+      <ResourceReference>A3</ResourceReference>
+      <ReferenceTitle><TitleText>Nature Birds Loop</TitleText></ReferenceTitle>
+      <Duration>PT52S</Duration>
+      <CreationDate>2026-03-01</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle"><TitleText>Nature Birds Loop</TitleText></Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName><FullName>Nature Sounds Factory</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayPublisher SequenceNumber="1">
+          <PartyReference>P2</PartyReference>
+          <PartyName><FullName>Sounds Factory LLC</FullName></PartyName>
+        </DisplayPublisher>
+        <PLine><Year>2026</Year><PLineText>℗ 2026 Sounds Factory LLC</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>© 2026 Sounds Factory LLC</CLineText></CLine>
+        <Genre><GenreText>Ambient</GenreText></Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T3</TechnicalResourceDetailsReference>
+          <AudioCodecType>MP3</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <File><FileName>nature_birds_loop.mp3</FileName><FilePath>audio/</FilePath></File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Track 4: Relaxing Ocean — 41s (fraud: sub-60s + duplicate ISRC) -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <!-- FRAUD: duplicate ISRC reused from Track 2 -->
+      <SoundRecordingId><ISRC>US-SF1-26-00002</ISRC></SoundRecordingId>
+      <ResourceReference>A4</ResourceReference>
+      <ReferenceTitle><TitleText>Relaxing Ocean</TitleText></ReferenceTitle>
+      <Duration>PT41S</Duration>
+      <CreationDate>2026-03-01</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle"><TitleText>Relaxing Ocean</TitleText></Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName><FullName>Nature Sounds Factory</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayPublisher SequenceNumber="1">
+          <PartyReference>P2</PartyReference>
+          <PartyName><FullName>Sounds Factory LLC</FullName></PartyName>
+        </DisplayPublisher>
+        <PLine><Year>2026</Year><PLineText>℗ 2026 Sounds Factory LLC</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>© 2026 Sounds Factory LLC</CLineText></CLine>
+        <Genre><GenreText>Ambient</GenreText></Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T4</TechnicalResourceDetailsReference>
+          <AudioCodecType>MP3</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <File><FileName>relaxing_ocean.mp3</FileName><FilePath>audio/</FilePath></File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Track 5: Thunder Meditation — 29s (fraud: sub-60s) -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId><ISRC>US-SF1-26-00005</ISRC></SoundRecordingId>
+      <ResourceReference>A5</ResourceReference>
+      <ReferenceTitle><TitleText>Thunder Meditation</TitleText></ReferenceTitle>
+      <Duration>PT29S</Duration>
+      <CreationDate>2026-03-01</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle"><TitleText>Thunder Meditation</TitleText></Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName><FullName>Nature Sounds Factory</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayPublisher SequenceNumber="1">
+          <PartyReference>P2</PartyReference>
+          <PartyName><FullName>Sounds Factory LLC</FullName></PartyName>
+        </DisplayPublisher>
+        <PLine><Year>2026</Year><PLineText>℗ 2026 Sounds Factory LLC</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>© 2026 Sounds Factory LLC</CLineText></CLine>
+        <Genre><GenreText>Ambient</GenreText></Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T5</TechnicalResourceDetailsReference>
+          <AudioCodecType>MP3</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>16</BitsPerSample>
+          <File><FileName>thunder_meditation.mp3</FileName><FilePath>audio/</FilePath></File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Artwork — 1500×1500 px (below 3000px minimum — another flag) -->
+    <Image>
+      <ImageType>FrontCoverImage</ImageType>
+      <ImageId>
+        <ProprietaryId Namespace="DDEX-LocalImageId">IMG-003</ProprietaryId>
+      </ImageId>
+      <ResourceReference>A6</ResourceReference>
+      <ReferenceTitle><TitleText>Relaxing Sounds Collection Vol. 47 — Cover</TitleText></ReferenceTitle>
+      <CreationDate>2026-03-01</CreationDate>
+      <ImageDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <ImageHeight>1500</ImageHeight>
+        <ImageWidth>1500</ImageWidth>
+        <ImageCodecType>JPEG</ImageCodecType>
+        <ImageResolution>72</ImageResolution>
+        <TechnicalImageDetails>
+          <TechnicalResourceDetailsReference>T6</TechnicalResourceDetailsReference>
+          <ImageCodecType>JPEG</ImageCodecType>
+          <ImageHeight>1500</ImageHeight>
+          <ImageWidth>1500</ImageWidth>
+          <ColorModel>RGB</ColorModel>
+          <File>
+            <FileName>relaxing_sounds_cover.jpg</FileName>
+            <FilePath>artwork/</FilePath>
+          </File>
+        </TechnicalImageDetails>
+      </ImageDetailsByTerritory>
+    </Image>
+
+  </ResourceList>
+
+  <ReleaseList>
+    <Release IsMainRelease="true">
+      <ReleaseReference>R0</ReleaseReference>
+      <ReleaseType>Album</ReleaseType>
+      <ReleaseId>
+        <GRid>TEST000000000001X</GRid>
+        <ICPN>0000000000001</ICPN>
+      </ReleaseId>
+      <ReferenceTitle><TitleText>Relaxing Sounds Collection Vol. 47</TitleText></ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A1</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A2</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A3</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A4</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A5</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="SecondaryResource">A6</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Nature Sounds Factory</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName><FullName>Nature Sounds Factory</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <LabelName>Sounds Factory LLC</LabelName>
+        <Title TitleType="FormalTitle"><TitleText>Relaxing Sounds Collection Vol. 47</TitleText></Title>
+        <PLine><Year>2026</Year><PLineText>℗ 2026 Sounds Factory LLC</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>© 2026 Sounds Factory LLC</CLineText></CLine>
+        <Genre><GenreText>Ambient</GenreText></Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <OriginalReleaseDate>2026-04-20</OriginalReleaseDate>
+        <ReleaseDate>2026-04-20</ReleaseDate>
+      </ReleaseDetailsByTerritory>
+    </Release>
+  </ReleaseList>
+
+  <DealList>
+    <ReleaseDeal>
+      <DealReleaseReference>R0</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <CommercialModelType>SubscriptionModel</CommercialModelType>
+          <Usage><UseType>OnDemandStream</UseType></Usage>
+          <TerritoryCode>Worldwide</TerritoryCode>
+          <ValidityPeriod><StartDate>2026-04-20</StartDate></ValidityPeriod>
+        </DealTerms>
+      </Deal>
+    </ReleaseDeal>
+  </DealList>
+
+</ern:NewReleaseMessage>

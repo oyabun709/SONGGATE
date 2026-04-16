@@ -207,10 +207,27 @@ class ArtworkValidator:
         Download artwork to a temp file.  Returns the temp file path.
 
         Supports:
-          - s3://bucket/key  (boto3 — uses IAM/env credentials)
+          - data:image/...;base64,…  (inline data URI)
+          - s3://bucket/key          (boto3 — uses IAM/env credentials)
           - https:// / http://
         """
         parsed = urlparse(url)
+
+        if parsed.scheme == "data":
+            # data:image/jpeg;base64,<payload>
+            import base64 as _b64
+            header, _, payload = url.partition(",")
+            raw = _b64.b64decode(payload) if ";base64" in header else payload.encode()
+            # Sniff extension from MIME type in header
+            mime = header.split(":")[1].split(";")[0] if ":" in header else ""
+            ext = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}.get(mime, ".bin")
+            tmp_fd, tmp_path = tempfile.mkstemp(
+                prefix=f"ropqa-art-{uuid.uuid4().hex[:8]}-", suffix=ext
+            )
+            os.close(tmp_fd)
+            with open(tmp_path, "wb") as f:
+                f.write(raw)
+            return tmp_path
 
         # Generate a stable extension from the URL path for Pillow format hints
         suffix = Path(parsed.path).suffix or ".bin"

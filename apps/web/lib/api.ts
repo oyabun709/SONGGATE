@@ -81,6 +81,10 @@ export interface Release {
   raw_package_url: string | null;
   status: string;
   created_at: string;
+  // Populated by the list endpoint JOIN — null if no scans yet
+  latest_scan_id: string | null;
+  latest_scan_grade: string | null;
+  latest_scan_score: number | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,12 +180,66 @@ export async function listReleaseScanHistory(
   return data;
 }
 
+export interface ScanWithRelease extends Scan {
+  release_title: string;
+  release_artist: string;
+}
+
+export async function listOrgScans(
+  token: string,
+  limit = 50
+): Promise<ScanWithRelease[]> {
+  const { data } = await api.get<ScanWithRelease[]>(`/scans?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard stats API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DashboardTopIssue {
+  rule_id: string;
+  layer: string;
+  severity: string;
+  count: number;
+}
+
+export interface DashboardTrendPoint {
+  date: string;
+  critical: number;
+  warning: number;
+  info: number;
+}
+
+export interface DashboardStats {
+  critical_issues: number;
+  scans_this_month: number;
+  top_issues: DashboardTopIssue[];
+  trend: DashboardTrendPoint[];
+}
+
+export async function getDashboardStats(token: string): Promise<DashboardStats> {
+  const { data } = await api.get<DashboardStats>("/scans/stats", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Release API
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function listReleases(token: string): Promise<Release[]> {
   const { data } = await api.get<Release[]>("/releases", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function getRelease(id: string, token: string): Promise<Release> {
+  const { data } = await api.get<Release>(`/releases/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   return data;
@@ -269,7 +327,7 @@ export interface ShareTokenOut {
 }
 
 export async function getAnalyticsOverview(token: string): Promise<AnalyticsOverview> {
-  const { data } = await api.get<AnalyticsOverview>("/api/v1/analytics/overview", {
+  const { data } = await api.get<AnalyticsOverview>("/analytics/overview", {
     headers: { Authorization: `Bearer ${token}` },
   });
   return data;
@@ -277,7 +335,7 @@ export async function getAnalyticsOverview(token: string): Promise<AnalyticsOver
 
 export async function refreshAnalyticsOverview(token: string): Promise<AnalyticsOverview> {
   const { data } = await api.post<AnalyticsOverview>(
-    "/api/v1/analytics/overview/refresh",
+    "/analytics/overview/refresh",
     {},
     { headers: { Authorization: `Bearer ${token}` } }
   );
@@ -286,7 +344,7 @@ export async function refreshAnalyticsOverview(token: string): Promise<Analytics
 
 export async function createShareLink(token: string): Promise<ShareTokenOut> {
   const { data } = await api.post<ShareTokenOut>(
-    "/api/v1/analytics/share",
+    "/analytics/share",
     {},
     { headers: { Authorization: `Bearer ${token}` } }
   );
@@ -375,5 +433,91 @@ export async function getInvoices(token: string): Promise<Invoice[]> {
   const { data } = await api.get<Invoice[]>("/billing/invoices", {
     headers: { Authorization: `Bearer ${token}` },
   });
+  return data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AdminOrg {
+  id: string;
+  clerk_org_id: string;
+  name: string;
+  tier: string;
+  scan_count_current_period: number;
+  scan_limit: number;
+  is_trial: boolean;
+  created_at: string;
+  total_scans: number;
+  total_releases: number;
+}
+
+export interface AdminScanItem {
+  id: string;
+  release_id: string;
+  release_title: string;
+  release_artist: string;
+  status: string;
+  grade: string | null;
+  readiness_score: number | null;
+  critical_count: number;
+  warning_count: number;
+  info_count: number;
+  created_at: string;
+}
+
+export async function adminListOrgs(token: string): Promise<AdminOrg[]> {
+  const { data } = await api.get<AdminOrg[]>("/admin/orgs", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function adminListOrgScans(
+  orgId: string,
+  token: string
+): Promise<AdminScanItem[]> {
+  const { data } = await api.get<AdminScanItem[]>(`/admin/orgs/${orgId}/scans`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function adminSetTrial(
+  orgId: string,
+  scanLimit: number,
+  token: string
+): Promise<{ org_id: string; is_trial: boolean; scan_limit: number }> {
+  const { data } = await api.patch(
+    `/admin/orgs/${orgId}/trial`,
+    { scan_limit: scanLimit, revoke: false },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return data;
+}
+
+export async function adminRevokeTrial(
+  orgId: string,
+  token: string
+): Promise<{ org_id: string; is_trial: boolean; scan_limit: number }> {
+  const { data } = await api.patch(
+    `/admin/orgs/${orgId}/trial`,
+    { revoke: true },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return data;
+}
+
+export async function adminSetTier(
+  orgId: string,
+  tier: "starter" | "pro" | "enterprise",
+  token: string
+): Promise<{ org_id: string; tier: string; is_trial: boolean; scan_limit: number }> {
+  const { data } = await api.patch(
+    `/admin/orgs/${orgId}/tier`,
+    { tier },
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
   return data;
 }

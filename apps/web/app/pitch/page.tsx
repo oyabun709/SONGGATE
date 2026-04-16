@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -38,32 +38,32 @@ const SLIDES = [
 
 function Slide01Cover() {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center gap-8">
-      <div className="flex items-center gap-3 mb-2">
-        <Zap className="h-8 w-8" style={{ color: ACCENT }} />
-        <span className="text-5xl font-black tracking-tight">SONGGATE</span>
+    <div className="flex flex-col items-center justify-center h-full text-center gap-6 sm:gap-8">
+      <div className="flex items-center gap-3 mb-1">
+        <Zap className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: ACCENT }} />
+        <span className="text-3xl sm:text-5xl font-black tracking-tight">SONGGATE</span>
       </div>
-      <p className="text-2xl font-light text-slate-300 max-w-xl leading-snug">
+      <p className="text-lg sm:text-2xl font-light text-slate-300 max-w-xl leading-snug">
         Pre-flight every release.
         <br />
         <span className="text-white font-medium">Catch errors before they cost you.</span>
       </p>
-      <div className="flex gap-4 mt-4">
+      <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full sm:w-auto px-4 sm:px-0">
         <Link
           href="/sign-up"
-          className="flex items-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-white"
+          className="flex items-center justify-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-white"
           style={{ background: ACCENT }}
         >
           Start free trial <ArrowRight className="h-4 w-4" />
         </Link>
         <Link
           href="/sign-up"
-          className="flex items-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-slate-300 border border-slate-700 hover:border-slate-500 transition-colors"
+          className="flex items-center justify-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-slate-300 border border-slate-700 hover:border-slate-500 transition-colors"
         >
           View live product
         </Link>
       </div>
-      <p className="text-xs text-slate-500 mt-2">No credit card required · Cancel anytime</p>
+      <p className="text-xs text-slate-500">No credit card required · Cancel anytime</p>
     </div>
   );
 }
@@ -87,34 +87,36 @@ function Slide02Problem() {
   ];
 
   return (
-    <div className="flex flex-col h-full justify-center gap-8">
-      <h2 className="text-4xl font-bold text-center">The Problem</h2>
-      <p className="text-center text-slate-400 text-lg -mt-4">
-        Metadata errors aren't caught until it's too late.
-      </p>
-      <div className="grid grid-cols-2 gap-6 max-w-4xl mx-auto w-full">
-        <div className="rounded-xl border border-red-900/50 bg-red-950/20 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <XCircle className="h-5 w-5 text-red-500" />
-            <span className="font-semibold text-red-400 text-sm uppercase tracking-widest">Without SONGGATE</span>
+    <div className="flex flex-col h-full justify-center gap-5 sm:gap-8">
+      <div>
+        <h2 className="text-2xl sm:text-4xl font-bold text-center">The Problem</h2>
+        <p className="text-center text-slate-400 text-sm sm:text-lg mt-1 sm:mt-2">
+          Metadata errors aren't caught until it's too late.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto w-full">
+        <div className="rounded-xl border border-red-900/50 bg-red-950/20 p-4 sm:p-6">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
+            <span className="font-semibold text-red-400 text-xs uppercase tracking-widest">Without SONGGATE</span>
           </div>
-          <ul className="space-y-3">
+          <ul className="space-y-2 sm:space-y-3">
             {before.map((item, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
+              <li key={i} className="flex items-start gap-3 text-xs sm:text-sm text-slate-300">
                 <span className="mt-0.5 text-slate-600 font-mono text-xs w-4 shrink-0">{i + 1}.</span>
                 <span className={i >= 2 && i <= 4 ? "text-red-300 font-medium" : ""}>{item}</span>
               </li>
             ))}
           </ul>
         </div>
-        <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/20 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-            <span className="font-semibold text-emerald-400 text-sm uppercase tracking-widest">With SONGGATE</span>
+        <div className="rounded-xl border border-emerald-900/50 bg-emerald-950/20 p-4 sm:p-6">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
+            <span className="font-semibold text-emerald-400 text-xs uppercase tracking-widest">With SONGGATE</span>
           </div>
-          <ul className="space-y-3">
+          <ul className="space-y-2 sm:space-y-3">
             {after.map((item, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
+              <li key={i} className="flex items-start gap-3 text-xs sm:text-sm text-slate-300">
                 <span className="mt-0.5 text-slate-600 font-mono text-xs w-4 shrink-0">{i + 1}.</span>
                 <span className={i >= 1 && i <= 3 ? "text-emerald-300 font-medium" : ""}>{item}</span>
               </li>
@@ -135,25 +137,27 @@ function Slide03Gap() {
     "API access",
   ];
   const tools = [
-    { name: "DDEX Validator", vals: [false, true, false, true, false] },
-    { name: "FUGA / CD Baby", vals: [false, false, false, false, false] },
+    { name: "DDEX\nValidator", vals: [false, true, false, true, false] },
+    { name: "FUGA /\nCD Baby", vals: [false, false, false, false, false] },
     { name: "DistroKid", vals: [false, false, false, false, false] },
     { name: "SONGGATE", vals: [true, true, true, true, true], highlight: true },
   ];
 
   return (
-    <div className="flex flex-col h-full justify-center gap-6">
-      <h2 className="text-4xl font-bold text-center">The Gap</h2>
-      <p className="text-center text-slate-400 -mt-3">No one owns the pre-delivery QA layer.</p>
+    <div className="flex flex-col h-full justify-center gap-4 sm:gap-6">
+      <div>
+        <h2 className="text-2xl sm:text-4xl font-bold text-center">The Gap</h2>
+        <p className="text-center text-slate-400 text-sm sm:text-base mt-1">No one owns the pre-delivery QA layer.</p>
+      </div>
       <div className="max-w-3xl mx-auto w-full overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs sm:text-sm" style={{ minWidth: 380 }}>
           <thead>
             <tr>
-              <th className="text-left py-3 px-4 text-slate-500 font-normal w-52">Capability</th>
+              <th className="text-left py-2 sm:py-3 px-2 sm:px-4 text-slate-500 font-normal w-36 sm:w-52">Capability</th>
               {tools.map((t) => (
                 <th
                   key={t.name}
-                  className={`py-3 px-4 text-center font-semibold ${t.highlight ? "text-white" : "text-slate-400"}`}
+                  className={`py-2 sm:py-3 px-2 sm:px-4 text-center font-semibold whitespace-pre-line ${t.highlight ? "text-white" : "text-slate-400"}`}
                   style={t.highlight ? { color: ACCENT } : {}}
                 >
                   {t.name}
@@ -164,13 +168,13 @@ function Slide03Gap() {
           <tbody>
             {capabilities.map((cap, ci) => (
               <tr key={cap} className={ci % 2 === 0 ? "bg-white/[0.02]" : ""}>
-                <td className="py-3 px-4 text-slate-300">{cap}</td>
+                <td className="py-2 sm:py-3 px-2 sm:px-4 text-slate-300 text-xs">{cap}</td>
                 {tools.map((t, ti) => (
-                  <td key={ti} className="py-3 px-4 text-center">
+                  <td key={ti} className="py-2 sm:py-3 px-2 sm:px-4 text-center">
                     {t.vals[ci] ? (
-                      <CheckCircle2 className="h-5 w-5 mx-auto text-emerald-500" />
+                      <CheckCircle2 className="h-4 w-4 mx-auto text-emerald-500" />
                     ) : (
-                      <XCircle className="h-5 w-5 mx-auto text-slate-700" />
+                      <XCircle className="h-4 w-4 mx-auto text-slate-700" />
                     )}
                   </td>
                 ))}
@@ -179,7 +183,7 @@ function Slide03Gap() {
           </tbody>
         </table>
       </div>
-      <p className="text-center text-xs text-slate-600 mt-2">
+      <p className="text-center text-xs text-slate-600">
         Distributor validation = submission gate tied to their pipeline. SONGGATE = standalone, runs anywhere.
       </p>
     </div>
@@ -202,43 +206,43 @@ function Slide04Product() {
   ];
 
   return (
-    <div className="flex flex-col h-full justify-center gap-6">
-      <h2 className="text-4xl font-bold text-center">The Product</h2>
-      <div className="grid grid-cols-2 gap-6 max-w-5xl mx-auto w-full">
-        <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">5 Validation Layers</p>
+    <div className="flex flex-col h-full justify-center gap-4 sm:gap-6">
+      <h2 className="text-2xl sm:text-4xl font-bold text-center">The Product</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-5xl mx-auto w-full">
+        <div className="space-y-2 sm:space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2 sm:mb-4">5 Validation Layers</p>
           {layers.map(({ icon: Icon, label, desc }) => (
-            <div key={label} className="flex items-start gap-3 rounded-lg border border-slate-800 bg-white/[0.02] p-3">
-              <div className="mt-0.5 rounded-md p-1.5" style={{ background: `${ACCENT}22` }}>
-                <Icon className="h-4 w-4" style={{ color: ACCENT }} />
+            <div key={label} className="flex items-start gap-3 rounded-lg border border-slate-800 bg-white/[0.02] p-2.5 sm:p-3">
+              <div className="mt-0.5 rounded-md p-1.5 shrink-0" style={{ background: `${ACCENT}22` }}>
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: ACCENT }} />
               </div>
               <div>
-                <div className="text-sm font-medium text-white">{label}</div>
+                <div className="text-xs sm:text-sm font-medium text-white">{label}</div>
                 <div className="text-xs text-slate-500 mt-0.5">{desc}</div>
               </div>
             </div>
           ))}
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">Live Scan Result</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-2 sm:mb-4">Live Scan Result</p>
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-slate-800">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b border-slate-800">
               <div>
-                <div className="font-semibold text-white">Luminous Decay — Nova Crest</div>
+                <div className="font-semibold text-white text-sm sm:text-base">Luminous Decay — Nova Crest</div>
                 <div className="text-xs text-slate-500 mt-0.5">3 tracks · DDEX ERN 4.3 · 2026-04-14</div>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-black text-red-400">42</div>
+                <div className="text-2xl sm:text-3xl font-black text-red-400">42</div>
                 <div className="rounded-full bg-red-900/50 px-2 py-0.5 text-xs font-semibold text-red-400 text-center mt-1">
                   FAIL
                 </div>
               </div>
             </div>
-            <div className="p-4 space-y-2">
-              <p className="text-xs text-slate-500 mb-3 font-semibold uppercase tracking-widest">Issues Found</p>
+            <div className="p-3 sm:p-4 space-y-2">
+              <p className="text-xs text-slate-500 mb-2 sm:mb-3 font-semibold uppercase tracking-widest">Issues Found</p>
               {issues.map((issue, i) => (
-                <div key={i} className="flex items-start gap-2 text-sm">
-                  <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-500" />
+                <div key={i} className="flex items-start gap-2 text-xs sm:text-sm">
+                  <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mt-0.5 shrink-0 text-red-500" />
                   <span className="text-slate-300">{issue}</span>
                 </div>
               ))}
@@ -276,14 +280,16 @@ function Slide05WhyNow() {
   ];
 
   return (
-    <div className="flex flex-col h-full justify-center gap-6">
-      <h2 className="text-4xl font-bold text-center">Why Now</h2>
-      <p className="text-center text-slate-400 -mt-3">Three forcing functions converging in 2025–2026.</p>
-      <div className="grid grid-cols-3 gap-5 max-w-5xl mx-auto w-full">
+    <div className="flex flex-col h-full justify-center gap-4 sm:gap-6">
+      <div>
+        <h2 className="text-2xl sm:text-4xl font-bold text-center">Why Now</h2>
+        <p className="text-center text-slate-400 text-sm sm:text-base mt-1">Three forcing functions converging in 2025–2026.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 max-w-5xl mx-auto w-full">
         {catalysts.map(({ icon, title, body, tag, tagColor }) => (
-          <div key={title} className="rounded-xl border border-slate-800 bg-white/[0.02] p-5 flex flex-col gap-3">
-            <div className="text-3xl">{icon}</div>
-            <div>
+          <div key={title} className="rounded-xl border border-slate-800 bg-white/[0.02] p-4 sm:p-5 flex flex-col gap-2 sm:gap-3">
+            <div className="flex sm:block items-center gap-3">
+              <span className="text-2xl sm:text-3xl">{icon}</span>
               <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${tagColor}`}>{tag}</span>
             </div>
             <h3 className="font-semibold text-white text-sm leading-snug">{title}</h3>
@@ -315,17 +321,19 @@ function Slide06Moat() {
   ];
 
   return (
-    <div className="flex flex-col h-full justify-center gap-6">
-      <h2 className="text-4xl font-bold text-center">The Moat</h2>
-      <p className="text-center text-slate-400 -mt-3">Data, rules, and pipeline depth that compounds over time.</p>
-      <div className="grid grid-cols-3 gap-5 max-w-5xl mx-auto w-full">
+    <div className="flex flex-col h-full justify-center gap-4 sm:gap-6">
+      <div>
+        <h2 className="text-2xl sm:text-4xl font-bold text-center">The Moat</h2>
+        <p className="text-center text-slate-400 text-sm sm:text-base mt-1">Data, rules, and pipeline depth that compounds over time.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 max-w-5xl mx-auto w-full">
         {moats.map(({ icon: Icon, title, body }) => (
-          <div key={title} className="rounded-xl border border-slate-800 bg-white/[0.02] p-6 flex flex-col gap-4">
+          <div key={title} className="rounded-xl border border-slate-800 bg-white/[0.02] p-4 sm:p-6 flex flex-col gap-3 sm:gap-4">
             <div className="rounded-lg p-2.5 w-fit" style={{ background: `${ACCENT}22` }}>
-              <Icon className="h-6 w-6" style={{ color: ACCENT }} />
+              <Icon className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: ACCENT }} />
             </div>
-            <h3 className="font-semibold text-white">{title}</h3>
-            <p className="text-sm text-slate-400 leading-relaxed">{body}</p>
+            <h3 className="font-semibold text-white text-sm sm:text-base">{title}</h3>
+            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">{body}</p>
           </div>
         ))}
       </div>
@@ -365,13 +373,13 @@ function Slide07BusinessModel() {
   ];
 
   return (
-    <div className="flex flex-col h-full justify-center gap-6">
-      <h2 className="text-4xl font-bold text-center">Business Model</h2>
-      <div className="grid grid-cols-3 gap-5 max-w-4xl mx-auto w-full">
+    <div className="flex flex-col h-full justify-center gap-4 sm:gap-6">
+      <h2 className="text-2xl sm:text-4xl font-bold text-center">Business Model</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 max-w-4xl mx-auto w-full">
         {tiers.map(({ name, price, unit, scans, arr, features, highlight }) => (
           <div
             key={name}
-            className="rounded-xl border p-5 flex flex-col gap-3"
+            className="rounded-xl border p-4 sm:p-5 flex flex-col gap-2 sm:gap-3"
             style={{
               borderColor: highlight ? ACCENT : "rgb(30,32,44)",
               background: highlight ? `${ACCENT}11` : "rgba(255,255,255,0.02)",
@@ -384,7 +392,7 @@ function Slide07BusinessModel() {
             )}
             <div className="text-sm font-semibold text-slate-400">{name}</div>
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-black text-white">{price}</span>
+              <span className="text-2xl sm:text-3xl font-black text-white">{price}</span>
               <span className="text-sm text-slate-500">{unit}</span>
             </div>
             <div className="text-xs text-slate-500">{scans}</div>
@@ -402,9 +410,9 @@ function Slide07BusinessModel() {
           </div>
         ))}
       </div>
-      <div className="max-w-4xl mx-auto w-full rounded-lg border border-slate-800 bg-white/[0.02] px-6 py-3 flex items-center justify-between">
-        <span className="text-sm text-slate-400">Path to $100K ARR</span>
-        <span className="text-sm text-white font-medium">
+      <div className="max-w-4xl mx-auto w-full rounded-lg border border-slate-800 bg-white/[0.02] px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 sm:gap-0">
+        <span className="text-xs sm:text-sm text-slate-400">Path to $100K ARR</span>
+        <span className="text-xs sm:text-sm text-white font-medium">
           1 Enterprise + 1 Professional + 2 Starter accounts
         </span>
       </div>
@@ -445,24 +453,24 @@ function Slide08WhoButsThis() {
   ];
 
   return (
-    <div className="flex flex-col h-full justify-center gap-6">
-      <h2 className="text-4xl font-bold text-center">Who Buys This</h2>
-      <div className="grid grid-cols-2 gap-4 max-w-4xl mx-auto w-full">
+    <div className="flex flex-col h-full justify-center gap-4 sm:gap-6">
+      <h2 className="text-2xl sm:text-4xl font-bold text-center">Who Buys This</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-4xl mx-auto w-full">
         {buyers.map(({ emoji, type, example, why, urgency }) => (
-          <div key={type} className="rounded-xl border border-slate-800 bg-white/[0.02] p-5 flex flex-col gap-2">
+          <div key={type} className="rounded-xl border border-slate-800 bg-white/[0.02] p-4 sm:p-5 flex flex-col gap-2">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">{emoji}</span>
-                <span className="font-semibold text-white">{type}</span>
+                <span className="text-xl sm:text-2xl">{emoji}</span>
+                <span className="font-semibold text-white text-sm sm:text-base">{type}</span>
               </div>
-              <span className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
+              <span className={`text-xs font-semibold rounded-full px-2 py-0.5 shrink-0 ${
                 urgency === "High" ? "bg-emerald-900/40 text-emerald-400" :
                 urgency === "Medium" ? "bg-amber-900/40 text-amber-400" :
                 "bg-violet-900/40 text-violet-400"
               }`}>{urgency}</span>
             </div>
             <div className="text-xs text-slate-500">{example}</div>
-            <p className="text-sm text-slate-300 leading-relaxed">{why}</p>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">{why}</p>
           </div>
         ))}
       </div>
@@ -508,14 +516,16 @@ function Slide09Acquisition() {
   ];
 
   return (
-    <div className="flex flex-col h-full justify-center gap-6">
-      <h2 className="text-4xl font-bold text-center">Acquisition Landscape</h2>
-      <p className="text-center text-slate-400 -mt-3">Music infrastructure M&A is active. Data moats get acquired.</p>
-      <div className="grid grid-cols-2 gap-4 max-w-4xl mx-auto w-full">
+    <div className="flex flex-col h-full justify-center gap-4 sm:gap-6">
+      <div>
+        <h2 className="text-2xl sm:text-4xl font-bold text-center">Acquisition Landscape</h2>
+        <p className="text-center text-slate-400 text-sm sm:text-base mt-1">Music infrastructure M&A is active. Data moats get acquired.</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-4xl mx-auto w-full">
         {deals.map(({ acquirer, target, value, year, why, relevance, highlight }) => (
           <div
             key={target}
-            className="rounded-xl border p-5 flex flex-col gap-2"
+            className="rounded-xl border p-4 sm:p-5 flex flex-col gap-2"
             style={{
               borderColor: highlight ? ACCENT : "rgb(30,32,44)",
               background: highlight ? `${ACCENT}11` : "rgba(255,255,255,0.02)",
@@ -529,10 +539,10 @@ function Slide09Acquisition() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="text-xs text-slate-500">{acquirer} acquired</div>
-                <div className="font-semibold text-white mt-0.5">{target}</div>
+                <div className="font-semibold text-white text-sm mt-0.5">{target}</div>
               </div>
               <div className="text-right shrink-0">
-                <div className="font-black text-lg" style={{ color: highlight ? ACCENT : "white" }}>{value}</div>
+                <div className="font-black text-base sm:text-lg" style={{ color: highlight ? ACCENT : "white" }}>{value}</div>
                 <div className="text-xs text-slate-500">{year}</div>
               </div>
             </div>
@@ -571,38 +581,42 @@ function Slide10Ask() {
   ];
 
   return (
-    <div className="flex flex-col h-full justify-center gap-6">
-      <h2 className="text-4xl font-bold text-center">The Ask</h2>
-      <p className="text-center text-slate-400 -mt-3">Three ways to work together.</p>
+    <div className="flex flex-col h-full justify-center gap-4 sm:gap-6">
+      <div>
+        <h2 className="text-2xl sm:text-4xl font-bold text-center">The Ask</h2>
+        <p className="text-center text-slate-400 text-sm sm:text-base mt-1">Three ways to work together.</p>
+      </div>
       <div className="max-w-3xl mx-auto w-full space-y-3">
         {rows.map(({ type, icon, what, get, ideal }) => (
-          <div key={type} className="rounded-xl border border-slate-800 bg-white/[0.02] p-4 grid grid-cols-[80px_1fr_1fr] gap-4 items-start">
-            <div className="flex flex-col items-center gap-1 text-center">
-              <span className="text-2xl">{icon}</span>
-              <span className="text-xs font-semibold text-slate-400">{type}</span>
+          <div key={type} className="rounded-xl border border-slate-800 bg-white/[0.02] p-4">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-xl">{icon}</span>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">{type}</span>
             </div>
-            <div>
-              <div className="text-sm font-semibold text-white mb-1">{what}</div>
-              <div className="text-xs text-slate-400 leading-relaxed">{get}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-slate-500 mb-1">Ideal for</div>
-              <div className="text-xs text-slate-300">{ideal}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-4">
+              <div>
+                <div className="text-sm font-semibold text-white mb-1">{what}</div>
+                <div className="text-xs text-slate-400 leading-relaxed">{get}</div>
+              </div>
+              <div className="sm:text-right mt-1 sm:mt-0">
+                <div className="text-xs text-slate-500 mb-0.5">Ideal for</div>
+                <div className="text-xs text-slate-300">{ideal}</div>
+              </div>
             </div>
           </div>
         ))}
       </div>
-      <div className="flex justify-center mt-2">
+      <div className="flex justify-center mt-1 sm:mt-2">
         <Link
           href="/sign-up"
-          className="flex items-center gap-2 rounded-lg px-8 py-3.5 text-sm font-semibold text-white shadow-lg"
+          className="flex items-center gap-2 rounded-lg px-6 sm:px-8 py-3 sm:py-3.5 text-sm font-semibold text-white shadow-lg"
           style={{ background: ACCENT }}
         >
           Start your pilot today <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
       <p className="text-center text-xs text-slate-600">
-        sales@songgate.io · songgate.vercel.app
+        andrew@housesonhills.io · songgate.io
       </p>
     </div>
   );
@@ -626,6 +640,7 @@ const SLIDE_COMPONENTS = [
 export default function PitchDeck() {
   const [current, setCurrent] = useState(0);
   const total = SLIDES.length;
+  const touchStartX = useRef<number | null>(null);
 
   const prev = useCallback(() => setCurrent((c) => Math.max(0, c - 1)), []);
   const next = useCallback(() => setCurrent((c) => Math.min(total - 1, c + 1)), [total]);
@@ -639,12 +654,27 @@ export default function PitchDeck() {
     return () => window.removeEventListener("keydown", handler);
   }, [next, prev]);
 
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 50) {
+      if (dx < 0) next();
+      else prev();
+    }
+    touchStartX.current = null;
+  };
+
   const SlideComponent = SLIDE_COMPONENTS[current];
 
   return (
     <div
       className="min-h-screen flex flex-col select-none"
       style={{ background: BG, color: "white", fontFamily: "Inter, sans-serif" }}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
     >
       {/* Progress bar */}
       <div className="fixed top-0 left-0 right-0 h-0.5 z-50" style={{ background: "rgba(255,255,255,0.06)" }}>
@@ -655,50 +685,48 @@ export default function PitchDeck() {
       </div>
 
       {/* Slide label */}
-      <div className="fixed top-4 left-0 right-0 flex justify-center z-40">
-        <span className="text-xs font-medium text-slate-600 uppercase tracking-widest">
+      <div className="fixed top-3 sm:top-4 left-0 right-0 flex justify-center z-40">
+        <span className="text-[10px] sm:text-xs font-medium text-slate-600 uppercase tracking-widest">
           {current + 1} / {total} — {SLIDES[current]}
         </span>
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex items-center justify-center px-8 py-20">
-        <div className="w-full max-w-5xl min-h-[500px] flex items-center">
-          <div className="w-full">
-            <SlideComponent />
-          </div>
+      {/* Main content — padded to avoid arrows on desktop, bottom nav on mobile */}
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-14 py-14 sm:py-20 pb-16 sm:pb-20">
+        <div className="w-full max-w-5xl">
+          <SlideComponent />
         </div>
       </div>
 
-      {/* Nav arrows */}
+      {/* Nav arrows — desktop only (sides), mobile bottom corners */}
       <button
         onClick={prev}
         disabled={current === 0}
-        className="fixed left-4 top-1/2 -translate-y-1/2 rounded-full p-2.5 border border-slate-800 bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-20 disabled:cursor-not-allowed transition-all z-40"
+        className="fixed left-2 sm:left-4 bottom-4 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 rounded-full p-2 sm:p-2.5 border border-slate-800 bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-20 disabled:cursor-not-allowed transition-all z-40"
         aria-label="Previous slide"
       >
-        <ChevronLeft className="h-5 w-5 text-slate-400" />
+        <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
       </button>
       <button
         onClick={next}
         disabled={current === total - 1}
-        className="fixed right-4 top-1/2 -translate-y-1/2 rounded-full p-2.5 border border-slate-800 bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-20 disabled:cursor-not-allowed transition-all z-40"
+        className="fixed right-2 sm:right-4 bottom-4 sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 rounded-full p-2 sm:p-2.5 border border-slate-800 bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-20 disabled:cursor-not-allowed transition-all z-40"
         aria-label="Next slide"
       >
-        <ChevronRight className="h-5 w-5 text-slate-400" />
+        <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
       </button>
 
       {/* Dot navigation */}
-      <div className="fixed bottom-6 left-0 right-0 flex justify-center gap-2 z-40">
+      <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-1.5 sm:gap-2 z-40 px-12">
         {SLIDES.map((label, i) => (
           <button
             key={i}
             onClick={() => setCurrent(i)}
             title={label}
-            className="rounded-full transition-all duration-300"
+            className="rounded-full transition-all duration-300 shrink-0"
             style={{
-              width: i === current ? 24 : 6,
-              height: 6,
+              width: i === current ? 20 : 5,
+              height: 5,
               background: i === current ? ACCENT : "rgba(255,255,255,0.2)",
             }}
             aria-label={`Go to slide ${i + 1}: ${label}`}

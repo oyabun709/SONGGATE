@@ -4,7 +4,7 @@ from fastapi.openapi.utils import get_openapi
 
 from config import settings
 from routers import releases, pipelines, rules, reports, health, webhooks, uploads, scans
-from routers import public_api, billing
+from routers import public_api, billing, admin
 
 app = FastAPI(
     title="RopQA API",
@@ -38,17 +38,21 @@ app = FastAPI(
     },
 )
 
-_CORS_ORIGINS = [
+_CORS_ORIGINS = list(dict.fromkeys(o for o in [
     "http://localhost:3000",
+    "https://songgate.io",
+    "https://www.songgate.io",
     settings.frontend_url,
-]
+] if o))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(dict.fromkeys(o for o in _CORS_ORIGINS if o)),
+    allow_origins=_CORS_ORIGINS,
+    allow_origin_regex=r"https://songgate-.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 # ── Health / webhooks (no auth) ───────────────────────────────────────────────
@@ -65,6 +69,9 @@ app.include_router(scans.router, tags=["scans"])
 
 # ── Billing (Clerk JWT) ───────────────────────────────────────────────────────
 app.include_router(billing.router, tags=["billing"])
+
+# ── Admin (Clerk JWT + admin user check) ──────────────────────────────────────
+app.include_router(admin.router, tags=["admin"])
 
 # ── Public API v1 (API key auth) ──────────────────────────────────────────────
 app.include_router(public_api.router, tags=["Public API v1"])

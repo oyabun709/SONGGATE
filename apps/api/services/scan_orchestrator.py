@@ -211,7 +211,9 @@ class ScanOrchestrator:
 
                 # ── Layer 4: Audio QA — fire Celery task, don't wait ───────
                 if "audio" in active_layers:
-                    await self._fire_audio_tasks(db, release, scan_id, dsps)
+                    audio_results = await self._fire_audio_tasks(db, release, scan_id, dsps)
+                    if audio_results:
+                        all_results.extend(audio_results)
 
                 # ── Layer 5: Artwork validation ────────────────────────────
                 if "artwork" in active_layers:
@@ -311,6 +313,42 @@ class ScanOrchestrator:
                             release.release_date = _date.fromisoformat(parsed["release_date"])
                         except (ValueError, TypeError):
                             pass
+                    # Upsert Track rows so per-track endpoints work
+                    from models.track import Track as TrackModel
+                    from sqlalchemy import select as _sel
+                    for idx, t in enumerate(parsed.get("tracks", []), start=1):
+                        raw_isrc = t.get("isrc") or None
+                        isrc = raw_isrc.replace("-", "")[:12] if raw_isrc else None
+                        # Find existing row by ISRC or by position
+                        existing_track = None
+                        if isrc:
+                            tr = await db.execute(
+                                _sel(TrackModel).where(
+                                    TrackModel.release_id == release.id,
+                                    TrackModel.isrc == isrc,
+                                )
+                            )
+                            existing_track = tr.scalar_one_or_none()
+                        if not existing_track:
+                            tr2 = await db.execute(
+                                _sel(TrackModel).where(
+                                    TrackModel.release_id == release.id,
+                                    TrackModel.track_number == idx,
+                                )
+                            )
+                            existing_track = tr2.scalar_one_or_none()
+                        if existing_track:
+                            existing_track.isrc = isrc
+                            existing_track.title = t.get("title") or existing_track.title
+                        else:
+                            db.add(TrackModel(
+                                id=uuid.uuid4(),
+                                release_id=release.id,
+                                isrc=isrc,
+                                title=t.get("title") or "Unknown",
+                                track_number=idx,
+                                duration_ms=t.get("duration_ms"),
+                            ))
                     await db.commit()
                     await db.refresh(release)
                     logger.info(
@@ -322,6 +360,10 @@ class ScanOrchestrator:
                     )
             except Exception as exc:
                 logger.warning("DDEX layer: metadata extraction failed: %s", exc)
+                try:
+                    await db.rollback()
+                except Exception:
+                    pass
 
         elif fmt == "CSV":
             from services.ddex.csv_parser import CSVParser
@@ -400,6 +442,12 @@ class ScanOrchestrator:
         now = datetime.now(timezone.utc)
         scan_uuid = uuid.UUID(scan_id)
 
+        # Load org settings to check test mode
+        from sqlalchemy import select as _sa_select
+        from models.organization import Organization as Org
+        org_row = await db.scalar(_sa_select(Org).where(Org.id == release.org_id))
+        is_test_org = bool((org_row.settings if org_row else {}).get("is_test", False))
+
         # Build velocity context from DB counts
         velocity = await self._build_velocity_context(db, release)
 
@@ -414,10 +462,24 @@ class ScanOrchestrator:
             known_isrcs=known_isrcs,
         )
 
+        # Velocity-based signal IDs (suppressed for test orgs to avoid false positives)
+        _velocity_signal_ids = {
+            "fraud.high_release_velocity_artist",
+            "fraud.high_release_velocity_org",
+            "high_release_velocity_artist",
+            "high_release_velocity_org",
+        }
+
         results: list[ScanResult] = []
         for sig in signals:
             # signal_id already includes the "fraud." prefix (e.g. "fraud.short_track_duration")
             rule_id = sig.signal_id if sig.signal_id.startswith("fraud.") else f"fraud.{sig.signal_id}"
+
+            # Skip velocity signals for test orgs
+            if is_test_org and (rule_id in _velocity_signal_ids or sig.signal_id in _velocity_signal_ids):
+                logger.debug("Skipping velocity signal %s for test org %s", rule_id, release.org_id)
+                continue
+
             await self._ensure_rule(db, rule_id, "fraud", sig.severity)
             status = ResultStatus.warn if sig.is_advisory else ResultStatus.fail
             results.append(ScanResult(
@@ -439,22 +501,73 @@ class ScanOrchestrator:
 
     async def _fire_audio_tasks(
         self, db: AsyncSession, release: Release, scan_id: str, dsps: list[str]
-    ) -> None:
-        """Fire analyze_audio_task for each track that has an audio_url."""
-        from tasks.audio_analysis import analyze_audio_task
+    ) -> list[ScanResult]:
+        """Inline audio analysis — no Celery, no Redis.
+
+        Downloads each track's audio URL and analyzes it synchronously using
+        mutagen (metadata) + soundfile/pyloudnorm (LUFS for lossless formats).
+        Returns ScanResults immediately so they are included in the scan score.
+        """
+        from services.audio.inline_analyzer import analyze_track_inline
 
         tracks_result = await db.execute(
             select(Track).where(Track.release_id == release.id)
         )
         tracks = list(tracks_result.scalars().all())
 
-        for track in tracks:
-            if track.audio_url:
-                analyze_audio_task.delay(
+        tracks_with_audio = [t for t in tracks if t.audio_url]
+        if not tracks_with_audio:
+            await self._ensure_rule(db, "audio.file.not_provided", "audio", "info")
+            return [ScanResult(
+                id=uuid.uuid4(),
+                scan_id=uuid.UUID(scan_id),
+                layer="audio",
+                rule_id="audio.file.not_provided",
+                severity="info",
+                status=ResultStatus.warn,
+                message="No audio files were uploaded — audio quality checks skipped.",
+                fix_hint=(
+                    "Set an audio URL per track via "
+                    "POST /releases/{id}/tracks/{track_id}/audio-url "
+                    "to enable loudness, duration, and codec validation."
+                ),
+                dsp_targets=[],
+                created_at=datetime.now(timezone.utc),
+            )]
+
+        all_audio_results: list[ScanResult] = []
+        for track in tracks_with_audio:
+            try:
+                track_results = await analyze_track_inline(
+                    audio_url=track.audio_url,
                     track_id=str(track.id),
+                    track_title=track.title,
                     scan_id=scan_id,
                     dsps=dsps,
+                    db=db,
                 )
+                all_audio_results.extend(track_results)
+            except Exception:
+                logger.warning(
+                    "Inline audio analysis failed for track %s", track.id, exc_info=True
+                )
+
+        if not all_audio_results and tracks_with_audio:
+            await self._ensure_rule(db, "audio.analysis.unavailable", "audio", "info")
+            all_audio_results.append(ScanResult(
+                id=uuid.uuid4(),
+                scan_id=uuid.UUID(scan_id),
+                layer="audio",
+                rule_id="audio.analysis.unavailable",
+                severity="info",
+                status=ResultStatus.warn,
+                message="Audio analysis could not complete for any track.",
+                fix_hint="Ensure audio URLs are publicly accessible and in a supported format (WAV, FLAC, MP3).",
+                dsp_targets=[],
+                created_at=datetime.now(timezone.utc),
+            ))
+
+        return all_audio_results
 
     async def _run_artwork_layer(
         self, db: AsyncSession, release: Release, scan_id: str
@@ -471,16 +584,32 @@ class ScanOrchestrator:
                 artwork_url = track.artwork_url
 
         if not artwork_url:
-            return []
+            await self._ensure_rule(db, "artwork.file.not_provided", "artwork", "info")
+            return [ScanResult(
+                id=uuid.uuid4(),
+                scan_id=uuid.UUID(scan_id),
+                layer="artwork",
+                rule_id="artwork.file.not_provided",
+                severity="info",
+                status=ResultStatus.warn,
+                message="No artwork file was uploaded — artwork dimension and format checks skipped.",
+                fix_hint="Upload a minimum 3000×3000 px JPEG/PNG cover image to enable artwork validation.",
+                dsp_targets=[],
+                created_at=datetime.now(timezone.utc),
+            )]
 
         now = datetime.now(timezone.utc)
         scan_uuid = uuid.UUID(scan_id)
 
         loop = asyncio.get_event_loop()
-        analysis = await loop.run_in_executor(
-            None,
-            lambda: self.artwork_validator.validate(artwork_url),
-        )
+        try:
+            analysis = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: self.artwork_validator.validate(artwork_url)),
+                timeout=10.0,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Artwork layer timed out — skipping")
+            return []
 
         results: list[ScanResult] = []
         for f in analysis.findings:
@@ -526,10 +655,13 @@ class ScanOrchestrator:
 
         loop = asyncio.get_event_loop()
         try:
-            enrichment = await loop.run_in_executor(
-                None,
-                lambda: self.enricher.enrich_release(meta),
+            enrichment = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: self.enricher.enrich_release(meta)),
+                timeout=4.0,
             )
+        except asyncio.TimeoutError:
+            logger.warning("Enrichment layer timed out for release %s — skipping", release.id)
+            return []
         except Exception as exc:
             logger.warning("Enrichment layer failed: %s", exc)
             return []
@@ -733,9 +865,18 @@ class ScanOrchestrator:
         await db.execute(stmt)
 
     async def _download_artifact(self, url: str) -> bytes:
-        """Download a release artifact from S3 or HTTP."""
+        """Download a release artifact from S3, HTTP, or an inline data: URI."""
         from urllib.parse import urlparse
         parsed = urlparse(url)
+
+        # Inline base64 data URI — used when S3 is not configured
+        if parsed.scheme == "data":
+            import base64
+            # data:application/xml;base64,<payload>
+            _header, _, payload = url.partition(",")
+            if ";base64" in _header:
+                return base64.b64decode(payload)
+            return payload.encode()
 
         if parsed.scheme == "s3":
             import boto3

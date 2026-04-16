@@ -112,7 +112,7 @@ async def _handle_org_created(data: dict, db: AsyncSession) -> None:
         clerk_org_id=clerk_org_id,
         name=name,
         tier=OrgTier.starter,
-        settings={},
+        settings={"is_trial": True, "scan_limit_override": 5},
     )
     db.add(org)
     await db.commit()

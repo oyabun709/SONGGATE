@@ -7,6 +7,7 @@ import { useDropzone } from "react-dropzone";
 import { Upload, FileText, ChevronRight, ChevronLeft, Check, Loader2, Music, FileCode2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createRelease, createScan } from "@/lib/api";
+import JSZip from "jszip";
 
 // ─── DSP options ─────────────────────────────────────────────────────────────
 const DSPS = [
@@ -101,9 +102,175 @@ export default function NewScanPage() {
     layers: LAYERS.map((l) => l.id),
   });
 
+  // ── Auto-populate parsers ─────────────────────────────────────────────────
+
+  function parseDdexXml(text: string): Partial<FormState> {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, "application/xml");
+      if (doc.querySelector("parsererror")) return {};
+
+      // Find main Release element inside ReleaseList
+      const releaseListEl = doc.getElementsByTagNameNS("*", "ReleaseList")[0]
+        ?? doc.getElementsByTagName("ReleaseList")[0];
+      let releaseEl: Element | null = null;
+      if (releaseListEl) {
+        const releases = Array.from(releaseListEl.children).filter(
+          (c) => c.localName === "Release"
+        );
+        releaseEl =
+          releases.find((r) => r.getAttribute("IsMainRelease") === "true") ??
+          releases[0] ??
+          null;
+      }
+      const scope = releaseEl ?? doc.documentElement;
+
+      const getFirst = (scope: Element, ...localNames: string[]): string | undefined => {
+        for (const name of localNames) {
+          const els = scope.getElementsByTagNameNS("*", name);
+          for (let i = 0; i < els.length; i++) {
+            const t = els[i].textContent?.trim();
+            if (t) return t;
+          }
+        }
+        return undefined;
+      };
+
+      const patch: Partial<FormState> = {};
+
+      // Title — prefer ReferenceTitle/TitleText, then FormalTitle, then any TitleText
+      let title: string | undefined;
+      const refTitle = scope.getElementsByTagNameNS("*", "ReferenceTitle")[0];
+      if (refTitle) {
+        title = getFirst(refTitle, "TitleText");
+      }
+      if (!title) {
+        const titleEls = scope.getElementsByTagNameNS("*", "Title");
+        for (let i = 0; i < titleEls.length; i++) {
+          if (titleEls[i].getAttribute("TitleType") === "FormalTitle") {
+            title = getFirst(titleEls[i], "TitleText");
+            if (title) break;
+          }
+        }
+      }
+      if (!title) title = getFirst(scope, "TitleText");
+      if (title) patch.title = title;
+
+      // Artist — prefer DisplayArtistName, then DisplayArtist/PartyName/FullName
+      let artist: string | undefined;
+      artist = getFirst(scope, "DisplayArtistName");
+      if (!artist) {
+        const daEls = scope.getElementsByTagNameNS("*", "DisplayArtist");
+        for (let i = 0; i < daEls.length; i++) {
+          const fn = daEls[i].getElementsByTagNameNS("*", "FullName")[0];
+          if (fn?.textContent?.trim()) { artist = fn.textContent.trim(); break; }
+        }
+      }
+      if (artist) patch.artist = artist;
+
+      // UPC
+      const upc = getFirst(scope, "ICPN", "UPC");
+      if (upc) patch.upc = upc;
+
+      // Date
+      const rawDate = getFirst(scope, "OriginalReleaseDate", "ReleaseDate");
+      if (rawDate) {
+        patch.releaseDate = rawDate.length === 4 ? `${rawDate}-01-01` : rawDate.slice(0, 10);
+      }
+
+      return patch;
+    } catch {
+      return {};
+    }
+  }
+
+  function parseCsv(text: string): Partial<FormState> {
+    const CSV_ALIASES: Record<string, keyof FormState> = {
+      title: "title", release_title: "title", album: "title", album_title: "title",
+      artist: "artist", artist_name: "artist", primary_artist: "artist", display_artist: "artist",
+      upc: "upc", barcode: "upc", ean: "upc", icpn: "upc",
+      release_date: "releaseDate", date: "releaseDate", original_release_date: "releaseDate",
+    };
+    try {
+      const lines = text.trim().split(/\r?\n/);
+      if (lines.length < 2) return {};
+      const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase().replace(/\s+/g, "_"));
+      const values = lines[1].split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+      const patch: Partial<FormState> = {};
+      headers.forEach((h, i) => {
+        const key = CSV_ALIASES[h];
+        if (key && values[i]) (patch as Record<string, string>)[key] = values[i];
+      });
+      if (patch.releaseDate && (patch.releaseDate as string).length === 4) {
+        (patch as Record<string, string>).releaseDate = `${patch.releaseDate}-01-01`;
+      }
+      return patch;
+    } catch {
+      return {};
+    }
+  }
+
+  function parseJson(text: string): Partial<FormState> {
+    const JSON_ALIASES: Record<string, keyof FormState> = {
+      title: "title", release_title: "title", album: "title",
+      artist: "artist", artist_name: "artist", primary_artist: "artist",
+      upc: "upc", barcode: "upc", icpn: "upc", ean: "upc",
+      release_date: "releaseDate", releasedate: "releaseDate", date: "releaseDate",
+      original_release_date: "releaseDate",
+    };
+    try {
+      let data = JSON.parse(text);
+      if (Array.isArray(data)) data = data[0];
+      if (typeof data !== "object" || data === null) return {};
+      const patch: Partial<FormState> = {};
+      for (const [k, v] of Object.entries(data)) {
+        const key = JSON_ALIASES[k.toLowerCase().replace(/[\s-]/g, "_")];
+        if (key && typeof v === "string" && v.trim()) (patch as Record<string, string>)[key] = v.trim();
+      }
+      if (patch.releaseDate && (patch.releaseDate as string).length === 4) {
+        (patch as Record<string, string>).releaseDate = `${patch.releaseDate}-01-01`;
+      }
+      return patch;
+    } catch {
+      return {};
+    }
+  }
+
   // ── File dropzone ────────────────────────────────────────────────────────
   const onDrop = useCallback((accepted: File[]) => {
-    if (accepted[0]) setForm((f) => ({ ...f, file: accepted[0] }));
+    const f = accepted[0];
+    if (!f) return;
+    const name = f.name.toLowerCase();
+
+    const applyPatch = (patch: Partial<FormState>) =>
+      setForm((prev) => ({ ...prev, file: f, ...patch }));
+
+    if (name.endsWith(".xml")) {
+      const reader = new FileReader();
+      reader.onload = (e) => applyPatch(parseDdexXml(e.target?.result as string));
+      reader.readAsText(f);
+    } else if (name.endsWith(".zip")) {
+      JSZip.loadAsync(f).then((zip) => {
+        const xmlFile = Object.values(zip.files).find(
+          (entry) => !entry.dir && entry.name.toLowerCase().endsWith(".xml")
+        );
+        if (xmlFile) {
+          xmlFile.async("text").then((text) => applyPatch(parseDdexXml(text)));
+        } else {
+          setForm((prev) => ({ ...prev, file: f }));
+        }
+      }).catch(() => setForm((prev) => ({ ...prev, file: f })));
+    } else if (name.endsWith(".csv")) {
+      const reader = new FileReader();
+      reader.onload = (e) => applyPatch(parseCsv(e.target?.result as string));
+      reader.readAsText(f);
+    } else if (name.endsWith(".json")) {
+      const reader = new FileReader();
+      reader.onload = (e) => applyPatch(parseJson(e.target?.result as string));
+      reader.readAsText(f);
+    } else {
+      setForm((prev) => ({ ...prev, file: f }));
+    }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -117,57 +284,24 @@ export default function NewScanPage() {
     maxFiles: 1,
   });
 
-  // ── S3 upload helpers ────────────────────────────────────────────────────
-  async function uploadFileToS3(
+  // ── Direct multipart upload to /releases/{id}/upload ────────────────────
+  async function uploadFileDirect(
     file: File,
     releaseId: string,
     token: string
-  ): Promise<string> {
+  ): Promise<void> {
     const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-    // 1. Get presigned PUT URL
-    const presignRes = await fetch(`${API}/uploads/presign`, {
+    const body = new FormData();
+    body.append("file", file);
+    const res = await fetch(`${API}/releases/${releaseId}/upload`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        filename: file.name,
-        content_type: file.type || "application/octet-stream",
-        release_id: releaseId,
-        file_type: "ddex_package",
-      }),
+      headers: { Authorization: `Bearer ${token}` },
+      body,
     });
-    if (!presignRes.ok) {
-      const d = await presignRes.json().catch(() => ({}));
-      throw new Error(d.detail ?? "Failed to get upload URL");
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.detail ?? "File upload failed");
     }
-    const { upload_url, object_key } = await presignRes.json();
-
-    // 2. PUT directly to S3
-    const putRes = await fetch(upload_url, {
-      method: "PUT",
-      headers: { "Content-Type": file.type || "application/octet-stream" },
-      body: file,
-    });
-    if (!putRes.ok) throw new Error("File upload to S3 failed");
-
-    // 3. Confirm upload — this creates the scan automatically
-    const confirmRes = await fetch(`${API}/uploads/confirm`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ object_key, release_id: releaseId, file_type: "ddex_package" }),
-    });
-    if (!confirmRes.ok) {
-      const d = await confirmRes.json().catch(() => ({}));
-      throw new Error(d.detail ?? "Upload confirmation failed");
-    }
-    const confirmed = await confirmRes.json();
-    return confirmed.scan_id as string;
   }
 
   // ── Submit & run scan ────────────────────────────────────────────────────
@@ -201,19 +335,17 @@ export default function NewScanPage() {
         token
       );
 
-      let scanIdToUse: string;
-
       if (form.inputMode === "upload" && form.file) {
-        // 2a. Upload file to S3 — confirm endpoint creates the scan
-        scanIdToUse = await uploadFileToS3(form.file, release.id, token);
-      } else {
-        // 2b. Manual entry — trigger scan directly
-        const scan = await createScan(release.id, token, {
-          dsps: form.dsps,
-          layers: form.layers,
-        });
-        scanIdToUse = scan.id;
+        // 2a. Upload file directly to API (stored as data URI)
+        await uploadFileDirect(form.file, release.id, token);
       }
+
+      // 2b. Trigger scan (always — file upload doesn't auto-create a scan)
+      const scan = await createScan(release.id, token, {
+        dsps: form.dsps,
+        layers: form.layers,
+      });
+      const scanIdToUse = scan.id;
 
       setScanId(scanIdToUse);
 
@@ -230,7 +362,7 @@ export default function NewScanPage() {
 
   async function pollUntilComplete(id: string, token: string) {
     const { getScan } = await import("@/lib/api");
-    for (let attempt = 0; attempt < 60; attempt++) {
+    for (let attempt = 0; attempt < 150; attempt++) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
         const scan = await getScan(id, token);

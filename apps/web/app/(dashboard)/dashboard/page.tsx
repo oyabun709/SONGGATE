@@ -23,27 +23,12 @@ import {
   Legend,
 } from "recharts";
 import { cn } from "@/lib/utils";
-import { listReleases, type Release } from "@/lib/api";
-
-// ─── Mock trend data until the stats endpoint exists ────────────────────────
-const TREND_DATA = Array.from({ length: 30 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() - (29 - i));
-  return {
-    date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    critical: Math.floor(Math.random() * 6),
-    warning: Math.floor(Math.random() * 12),
-    info: Math.floor(Math.random() * 8),
-  };
-});
-
-const TOP_ISSUES = [
-  { rule_id: "universal.artwork.resolution_too_low", count: 47, layer: "artwork", severity: "critical" },
-  { rule_id: "universal.metadata.upc_required", count: 33, layer: "metadata", severity: "critical" },
-  { rule_id: "spotify.audio.loudness_too_loud", count: 28, layer: "audio", severity: "warning" },
-  { rule_id: "universal.metadata.c_line_required", count: 24, layer: "metadata", severity: "warning" },
-  { rule_id: "tiktok.audio.duration_too_short", count: 19, layer: "audio", severity: "warning" },
-];
+import {
+  listReleases,
+  getDashboardStats,
+  type Release,
+  type DashboardStats,
+} from "@/lib/api";
 
 function GradeBadge({ grade }: { grade: string | null }) {
   if (!grade) return <span className="text-xs text-slate-400">—</span>;
@@ -74,9 +59,16 @@ const SEVERITY_CLS: Record<string, string> = {
   info: "bg-blue-50 text-blue-700",
 };
 
+function ruleLabel(rule_id: string): string {
+  // "universal.artwork.resolution_too_low" → "Resolution Too Low"
+  const parts = rule_id.split(".");
+  return parts.slice(2).join(" ").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || rule_id;
+}
+
 export default function DashboardPage() {
   const { getToken } = useAuth();
   const [releases, setReleases] = useState<Release[]>([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -84,9 +76,14 @@ export default function DashboardPage() {
     try {
       const token = await getToken();
       if (!token) return;
-      setReleases(await listReleases(token));
+      const [rel, st] = await Promise.all([
+        listReleases(token),
+        getDashboardStats(token),
+      ]);
+      setReleases(rel);
+      setStats(st);
     } catch {
-      /* empty state */
+      /* show empty state */
     } finally {
       setLoading(false);
     }
@@ -97,7 +94,7 @@ export default function DashboardPage() {
   const total = releases.length;
   const passRate =
     total > 0
-      ? Math.round((releases.filter((r) => r.status === "complete").length / total) * 100)
+      ? Math.round((releases.filter((r) => r.latest_scan_grade === "PASS").length / total) * 100)
       : null;
 
   return (
@@ -131,10 +128,34 @@ export default function DashboardPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: "Total Releases Scanned", value: loading ? "…" : String(total), icon: Package, color: "text-indigo-600", bg: "bg-indigo-50" },
-          { label: "PASS Rate", value: loading ? "…" : passRate !== null ? `${passRate}%` : "—", icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
-          { label: "Critical Issues", value: "—", icon: XCircle, color: "text-red-600", bg: "bg-red-50" },
-          { label: "Scans This Month", value: "—", icon: TrendingUp, color: "text-violet-600", bg: "bg-violet-50" },
+          {
+            label: "Total Releases Scanned",
+            value: loading ? "…" : String(total),
+            icon: Package,
+            color: "text-indigo-600",
+            bg: "bg-indigo-50",
+          },
+          {
+            label: "PASS Rate",
+            value: loading ? "…" : passRate !== null ? `${passRate}%` : "—",
+            icon: CheckCircle2,
+            color: "text-emerald-600",
+            bg: "bg-emerald-50",
+          },
+          {
+            label: "Critical Issues",
+            value: loading ? "…" : stats ? String(stats.critical_issues) : "—",
+            icon: XCircle,
+            color: "text-red-600",
+            bg: "bg-red-50",
+          },
+          {
+            label: "Scans This Month",
+            value: loading ? "…" : stats ? String(stats.scans_this_month) : "—",
+            icon: TrendingUp,
+            color: "text-violet-600",
+            bg: "bg-violet-50",
+          },
         ].map((s) => (
           <div key={s.label} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between">
@@ -186,11 +207,17 @@ export default function DashboardPage() {
                     <tr key={r.id} className="hover:bg-slate-50/60">
                       <td className="px-5 py-3 font-medium text-slate-800">{r.title}</td>
                       <td className="px-5 py-3 text-slate-500">{r.artist}</td>
-                      <td className="px-5 py-3"><span className="text-xs text-slate-400">—</span></td>
-                      <td className="px-5 py-3"><GradeBadge grade={null} /></td>
+                      <td className="px-5 py-3">
+                        {r.latest_scan_score != null
+                          ? <span className="tabular-nums text-xs font-semibold text-slate-700">{Math.round(r.latest_scan_score)}</span>
+                          : <span className="text-xs text-slate-400">—</span>}
+                      </td>
+                      <td className="px-5 py-3"><GradeBadge grade={r.latest_scan_grade ?? null} /></td>
                       <td className="px-5 py-3 text-xs text-slate-400">{new Date(r.created_at).toLocaleDateString()}</td>
                       <td className="px-5 py-3 text-right">
-                        <Link href={`/releases/${r.id}`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700">View →</Link>
+                        {r.latest_scan_id
+                          ? <Link href={`/scans/${r.latest_scan_id}`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700">View Scan →</Link>
+                          : <Link href={`/releases/${r.id}`} className="text-xs font-medium text-slate-400 hover:text-slate-600">Details →</Link>}
                       </td>
                     </tr>
                   ))}
@@ -206,28 +233,40 @@ export default function DashboardPage() {
             <h2 className="text-sm font-semibold text-slate-900">Top Issues</h2>
             <p className="mt-0.5 text-xs text-slate-400">Most frequent failures across all scans</p>
           </div>
-          <div className="divide-y divide-slate-50">
-            {TOP_ISSUES.map((issue, i) => (
-              <div key={issue.rule_id} className="flex items-start gap-3 px-5 py-3.5">
-                <span className="mt-0.5 w-4 text-xs font-bold text-slate-300 tabular-nums">{i + 1}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium text-slate-700">
-                    {issue.rule_id.split(".").slice(2).join(".").replaceAll("_", " ")}
-                  </p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className={cn("inline-block h-2 w-2 rounded-full", LAYER_COLORS[issue.layer] ?? "bg-slate-300")} />
-                    <span className="text-xs capitalize text-slate-400">{issue.layer}</span>
-                    <span className={cn("rounded px-1.5 py-0.5 text-xs font-medium capitalize", SEVERITY_CLS[issue.severity])}>
-                      {issue.severity}
-                    </span>
+          {loading ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+            </div>
+          ) : !stats || stats.top_issues.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center px-5">
+              <CheckCircle2 className="mb-2 h-7 w-7 text-slate-200" />
+              <p className="text-sm text-slate-400">No issues found yet</p>
+              <p className="mt-0.5 text-xs text-slate-300">Run a scan to see top issues here.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-50">
+              {stats.top_issues.map((issue, i) => (
+                <div key={issue.rule_id} className="flex items-start gap-3 px-5 py-3.5">
+                  <span className="mt-0.5 w-4 text-xs font-bold text-slate-300 tabular-nums">{i + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-slate-700">
+                      {ruleLabel(issue.rule_id)}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className={cn("inline-block h-2 w-2 rounded-full", LAYER_COLORS[issue.layer] ?? "bg-slate-300")} />
+                      <span className="text-xs capitalize text-slate-400">{issue.layer}</span>
+                      <span className={cn("rounded px-1.5 py-0.5 text-xs font-medium capitalize", SEVERITY_CLS[issue.severity] ?? "bg-slate-100 text-slate-500")}>
+                        {issue.severity}
+                      </span>
+                    </div>
                   </div>
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 tabular-nums">
+                    {issue.count}
+                  </span>
                 </div>
-                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 tabular-nums">
-                  {issue.count}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -239,34 +278,46 @@ export default function DashboardPage() {
             <p className="mt-0.5 text-xs text-slate-400">Critical · Warning · Info counts per day</p>
           </div>
         </div>
-        <ResponsiveContainer width="100%" height={196}>
-          <AreaChart data={TREND_DATA} margin={{ top: 0, right: 4, left: -20, bottom: 0 }}>
-            <defs>
-              {[
-                { id: "gCritical", color: "#ef4444" },
-                { id: "gWarning", color: "#f59e0b" },
-                { id: "gInfo", color: "#6366f1" },
-              ].map(({ id, color }) => (
-                <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.15} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0} />
-                </linearGradient>
-              ))}
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} interval={6} />
-            <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
-            <Tooltip
-              contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "6px", fontSize: "12px", color: "#f1f5f9" }}
-              itemStyle={{ color: "#f1f5f9" }}
-              labelStyle={{ color: "#94a3b8", marginBottom: "4px" }}
-            />
-            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }} />
-            <Area type="monotone" dataKey="critical" stroke="#ef4444" strokeWidth={2} fill="url(#gCritical)" name="Critical" />
-            <Area type="monotone" dataKey="warning" stroke="#f59e0b" strokeWidth={2} fill="url(#gWarning)" name="Warning" />
-            <Area type="monotone" dataKey="info" stroke="#6366f1" strokeWidth={1.5} fill="url(#gInfo)" name="Info" />
-          </AreaChart>
-        </ResponsiveContainer>
+        {loading ? (
+          <div className="flex items-center justify-center" style={{ height: 196 }}>
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+          </div>
+        ) : !stats || stats.trend.every((p) => p.critical === 0 && p.warning === 0 && p.info === 0) ? (
+          <div className="flex flex-col items-center justify-center text-center" style={{ height: 196 }}>
+            <TrendingUp className="mb-2 h-7 w-7 text-slate-200" />
+            <p className="text-sm text-slate-400">No scan data in the last 30 days</p>
+            <p className="mt-0.5 text-xs text-slate-300">Trend will appear after your first scan.</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={196}>
+            <AreaChart data={stats.trend} margin={{ top: 0, right: 4, left: -20, bottom: 0 }}>
+              <defs>
+                {[
+                  { id: "gCritical", color: "#ef4444" },
+                  { id: "gWarning", color: "#f59e0b" },
+                  { id: "gInfo", color: "#6366f1" },
+                ].map(({ id, color }) => (
+                  <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={color} stopOpacity={0.15} />
+                    <stop offset="95%" stopColor={color} stopOpacity={0} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} interval={6} />
+              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "6px", fontSize: "12px", color: "#f1f5f9" }}
+                itemStyle={{ color: "#f1f5f9" }}
+                labelStyle={{ color: "#94a3b8", marginBottom: "4px" }}
+              />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }} />
+              <Area type="monotone" dataKey="critical" stroke="#ef4444" strokeWidth={2} fill="url(#gCritical)" name="Critical" />
+              <Area type="monotone" dataKey="warning" stroke="#f59e0b" strokeWidth={2} fill="url(#gWarning)" name="Warning" />
+              <Area type="monotone" dataKey="info" stroke="#6366f1" strokeWidth={1.5} fill="url(#gInfo)" name="Info" />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

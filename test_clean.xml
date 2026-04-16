@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  DDEX ERN 4.3 NewReleaseMessage — CLEAN / PASS TEST FILE
+  Release:  Stellar Horizons
+  Artist:   Auric Wave
+  Label:    Prism Records
+  All fields valid — expected result: PASS (score ≥ 80)
+-->
+<ern:NewReleaseMessage
+  xmlns:ern="http://ddex.net/xml/ern/43"
+  xmlns:avs="http://ddex.net/xml/avs/avs"
+  MessageSchemaVersionId="ern/43"
+  LanguageAndScriptCode="en">
+
+  <MessageHeader>
+    <MessageThreadId>MSG-2026-CLEAN-001</MessageThreadId>
+    <MessageId>MSG-2026-CLEAN-001-A</MessageId>
+    <MessageSender>
+      <PartyId>PADPIDAA11111111X</PartyId>
+      <PartyName><FullName>Prism Records</FullName></PartyName>
+    </MessageSender>
+    <SentOnBehalfOf>
+      <PartyId>PADPIDAA22222222X</PartyId>
+      <PartyName><FullName>Auric Wave</FullName></PartyName>
+    </SentOnBehalfOf>
+    <MessageRecipient>
+      <PartyId>PADPIDAA99999999X</PartyId>
+      <PartyName><FullName>Digital Service Provider</FullName></PartyName>
+    </MessageRecipient>
+    <MessageCreatedDateTime>2026-04-15T08:00:00Z</MessageCreatedDateTime>
+    <MessageControlType>LiveMessage</MessageControlType>
+  </MessageHeader>
+
+  <PartyList>
+    <Party>
+      <PartyReference>P1</PartyReference>
+      <PartyId>IPI:00000001000</PartyId>
+      <PartyName><FullName>Auric Wave</FullName></PartyName>
+    </Party>
+    <Party>
+      <PartyReference>P2</PartyReference>
+      <PartyId>IPI:00000001001</PartyId>
+      <PartyName><FullName>Prism Records</FullName></PartyName>
+    </Party>
+    <Party>
+      <PartyReference>P3</PartyReference>
+      <PartyId>IPI:00000001002</PartyId>
+      <PartyName><FullName>Horizon Music Publishing</FullName></PartyName>
+    </Party>
+  </PartyList>
+
+  <ResourceList>
+
+    <!-- Track 1: Chromatic Pulse — 4m 22s, valid ISRC, publisher present -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId><ISRC>US-PR1-26-00001</ISRC></SoundRecordingId>
+      <ResourceReference>A1</ResourceReference>
+      <ReferenceTitle><TitleText>Chromatic Pulse</TitleText></ReferenceTitle>
+      <Duration>PT4M22S</Duration>
+      <CreationDate>2026-01-10</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle"><TitleText>Chromatic Pulse</TitleText></Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName><FullName>Auric Wave</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayPublisher SequenceNumber="1">
+          <PartyReference>P3</PartyReference>
+          <PartyName><FullName>Horizon Music Publishing</FullName></PartyName>
+        </DisplayPublisher>
+        <Contributor>
+          <PartyName><FullName>Auric Wave</FullName></PartyName>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor>
+          <PartyName><FullName>Auric Wave</FullName></PartyName>
+          <Role>Composer</Role>
+        </Contributor>
+        <PLine><Year>2026</Year><PLineText>℗ 2026 Prism Records</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>© 2026 Auric Wave / Prism Records</CLineText></CLine>
+        <Genre><GenreText>Electronic</GenreText><SubGenre>Synthwave</SubGenre></Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T1</TechnicalResourceDetailsReference>
+          <AudioCodecType>FLAC</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>24</BitsPerSample>
+          <File>
+            <FileName>auric_wave-chromatic_pulse.flac</FileName>
+            <FilePath>audio/</FilePath>
+            <HashSum><Algorithm>MD5</Algorithm><HashSumValue>aabbcc112233aabbcc112233aabbcc11</HashSumValue></HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Track 2: Refraction — 3m 55s, valid ISRC, publisher present -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId><ISRC>US-PR1-26-00002</ISRC></SoundRecordingId>
+      <ResourceReference>A2</ResourceReference>
+      <ReferenceTitle><TitleText>Refraction</TitleText></ReferenceTitle>
+      <Duration>PT3M55S</Duration>
+      <CreationDate>2026-01-15</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle"><TitleText>Refraction</TitleText></Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName><FullName>Auric Wave</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayPublisher SequenceNumber="1">
+          <PartyReference>P3</PartyReference>
+          <PartyName><FullName>Horizon Music Publishing</FullName></PartyName>
+        </DisplayPublisher>
+        <Contributor>
+          <PartyName><FullName>Auric Wave</FullName></PartyName>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor>
+          <PartyName><FullName>Auric Wave</FullName></PartyName>
+          <Role>Composer</Role>
+        </Contributor>
+        <PLine><Year>2026</Year><PLineText>℗ 2026 Prism Records</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>© 2026 Auric Wave / Prism Records</CLineText></CLine>
+        <Genre><GenreText>Electronic</GenreText><SubGenre>Synthwave</SubGenre></Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T2</TechnicalResourceDetailsReference>
+          <AudioCodecType>FLAC</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>24</BitsPerSample>
+          <File>
+            <FileName>auric_wave-refraction.flac</FileName>
+            <FilePath>audio/</FilePath>
+            <HashSum><Algorithm>MD5</Algorithm><HashSumValue>bbccdd223344bbccdd223344bbccdd22</HashSumValue></HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Track 3: Deep Current — 5m 10s -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId><ISRC>US-PR1-26-00003</ISRC></SoundRecordingId>
+      <ResourceReference>A3</ResourceReference>
+      <ReferenceTitle><TitleText>Deep Current</TitleText></ReferenceTitle>
+      <Duration>PT5M10S</Duration>
+      <CreationDate>2026-02-01</CreationDate>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle"><TitleText>Deep Current</TitleText></Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName><FullName>Auric Wave</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <DisplayPublisher SequenceNumber="1">
+          <PartyReference>P3</PartyReference>
+          <PartyName><FullName>Horizon Music Publishing</FullName></PartyName>
+        </DisplayPublisher>
+        <Contributor>
+          <PartyName><FullName>Auric Wave</FullName></PartyName>
+          <Role>Author</Role>
+        </Contributor>
+        <Contributor>
+          <PartyName><FullName>Auric Wave</FullName></PartyName>
+          <Role>Composer</Role>
+        </Contributor>
+        <PLine><Year>2026</Year><PLineText>℗ 2026 Prism Records</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>© 2026 Auric Wave / Prism Records</CLineText></CLine>
+        <Genre><GenreText>Electronic</GenreText><SubGenre>Synthwave</SubGenre></Genre>
+        <IsExplicit>NotExplicit</IsExplicit>
+        <RightsController>
+          <PartyReference>P2</PartyReference>
+          <RightsControllerRole>RightsController</RightsControllerRole>
+          <RightSharePercentage>100.00</RightSharePercentage>
+        </RightsController>
+        <TechnicalSoundRecordingDetails>
+          <TechnicalResourceDetailsReference>T3</TechnicalResourceDetailsReference>
+          <AudioCodecType>FLAC</AudioCodecType>
+          <NumberOfChannels>2</NumberOfChannels>
+          <SamplingRate>44100</SamplingRate>
+          <BitsPerSample>24</BitsPerSample>
+          <File>
+            <FileName>auric_wave-deep_current.flac</FileName>
+            <FilePath>audio/</FilePath>
+            <HashSum><Algorithm>MD5</Algorithm><HashSumValue>ccdde5f6a7b8c9d0e1f2a3b4c5d6e7f8</HashSumValue></HashSum>
+          </File>
+        </TechnicalSoundRecordingDetails>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Artwork — 3000×3000 px (meets DSP minimum) -->
+    <Image>
+      <ImageType>FrontCoverImage</ImageType>
+      <ImageId>
+        <ProprietaryId Namespace="DDEX-LocalImageId">IMG-002</ProprietaryId>
+      </ImageId>
+      <ResourceReference>A4</ResourceReference>
+      <ReferenceTitle><TitleText>Stellar Horizons — Front Cover</TitleText></ReferenceTitle>
+      <CreationDate>2026-02-10</CreationDate>
+      <ImageDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <ImageHeight>3000</ImageHeight>
+        <ImageWidth>3000</ImageWidth>
+        <ImageCodecType>JPEG</ImageCodecType>
+        <ImageResolution>300</ImageResolution>
+        <TechnicalImageDetails>
+          <TechnicalResourceDetailsReference>T4</TechnicalResourceDetailsReference>
+          <ImageCodecType>JPEG</ImageCodecType>
+          <ImageHeight>3000</ImageHeight>
+          <ImageWidth>3000</ImageWidth>
+          <ColorModel>RGB</ColorModel>
+          <File>
+            <FileName>stellar_horizons_cover.jpg</FileName>
+            <FilePath>artwork/</FilePath>
+            <HashSum><Algorithm>MD5</Algorithm><HashSumValue>ddee66778899ddee66778899ddee6677</HashSumValue></HashSum>
+          </File>
+        </TechnicalImageDetails>
+      </ImageDetailsByTerritory>
+    </Image>
+
+  </ResourceList>
+
+  <ReleaseList>
+    <Release IsMainRelease="true">
+      <ReleaseReference>R0</ReleaseReference>
+      <ReleaseType>Album</ReleaseType>
+      <ReleaseId>
+        <GRid>A1PRISM2026AW001X</GRid>
+        <ICPN>9780000000001</ICPN>
+      </ReleaseId>
+      <ReferenceTitle><TitleText>Stellar Horizons</TitleText></ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A1</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A2</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A3</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="SecondaryResource">A4</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Auric Wave</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyReference>P1</PartyReference>
+          <PartyName><FullName>Auric Wave</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <LabelName>Prism Records</LabelName>
+        <Title TitleType="FormalTitle"><TitleText>Stellar Horizons</TitleText></Title>
+        <PLine><Year>2026</Year><PLineText>℗ 2026 Prism Records</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>© 2026 Auric Wave / Prism Records</CLineText></CLine>
+        <Genre><GenreText>Electronic</GenreText><SubGenre>Synthwave</SubGenre></Genre>
+        <ParentalWarningType>NotExplicit</ParentalWarningType>
+        <OriginalReleaseDate>2026-06-01</OriginalReleaseDate>
+        <ReleaseDate>2026-06-01</ReleaseDate>
+      </ReleaseDetailsByTerritory>
+    </Release>
+  </ReleaseList>
+
+  <DealList>
+    <ReleaseDeal>
+      <DealReleaseReference>R0</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <CommercialModelType>SubscriptionModel</CommercialModelType>
+          <Usage><UseType>OnDemandStream</UseType></Usage>
+          <Usage><UseType>PermanentDownload</UseType></Usage>
+          <TerritoryCode>Worldwide</TerritoryCode>
+          <ValidityPeriod><StartDate>2026-06-01</StartDate></ValidityPeriod>
+        </DealTerms>
+      </Deal>
+    </ReleaseDeal>
+  </DealList>
+
+</ern:NewReleaseMessage>

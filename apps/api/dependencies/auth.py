@@ -151,11 +151,18 @@ async def get_current_org(
     claims = await _verify_clerk_jwt(token)
 
     clerk_org_id: str | None = claims.get("org_id")
+    clerk_user_id: str | None = claims.get("sub")
+
     if not clerk_org_id:
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            detail="No active organization in token — select an org in the frontend",
-        )
+        # No active org in token — fall back to a personal workspace keyed by
+        # the user's Clerk ID.  This handles accounts that haven't joined an org
+        # yet, or sessions where the org wasn't synced to the short-lived JWT.
+        if not clerk_user_id:
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED,
+                detail="No active organization in token — select an org in the frontend",
+            )
+        clerk_org_id = f"user_{clerk_user_id}"
 
     # Look up the org by Clerk's org ID
     result = await db.execute(
@@ -172,6 +179,7 @@ async def get_current_org(
             id=uuid.uuid4(),
             clerk_org_id=clerk_org_id,
             name=org_name,
+            settings={"is_trial": True, "scan_limit_override": 5},
         )
         db.add(org)
         try:

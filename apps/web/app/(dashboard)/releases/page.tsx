@@ -266,10 +266,16 @@ export default function ReleasesPage() {
                       {r.upc ?? "—"}
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="text-xs text-slate-400">—</span>
+                      {r.latest_scan_score != null ? (
+                        <span className="tabular-nums text-xs font-semibold text-slate-700">
+                          {Math.round(r.latest_scan_score)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5">
-                      <GradeBadge grade={null} />
+                      <GradeBadge grade={r.latest_scan_grade ?? null} />
                     </td>
                     <td className="px-5 py-3.5">
                       <StatusBadge status={r.status} />
@@ -283,6 +289,14 @@ export default function ReleasesPage() {
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {r.latest_scan_id && (
+                          <Link
+                            href={`/scans/${r.latest_scan_id}`}
+                            className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                          >
+                            View Scan
+                          </Link>
+                        )}
                         <Link
                           href={`/releases/${r.id}`}
                           className="text-xs font-medium text-slate-500 hover:text-slate-700"
@@ -290,10 +304,10 @@ export default function ReleasesPage() {
                           Details
                         </Link>
                         <Link
-                          href={`/releases/new?prefill=${r.id}`}
+                          href="/releases/new"
                           className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
                         >
-                          Re-scan →
+                          New Scan →
                         </Link>
                       </div>
                     </td>

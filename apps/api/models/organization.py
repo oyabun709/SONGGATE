@@ -83,6 +83,9 @@ class Organization(Base):
 
     @property
     def scan_limit(self) -> int:
+        override = (self.settings or {}).get("scan_limit_override")
+        if override is not None:
+            return int(override)
         return TIER_SCAN_LIMIT.get(self.tier, 50)
 
     @property

@@ -29,3 +29,8 @@ class ReleaseRead(BaseModel):
     raw_package_url: str | None
     status: ReleaseStatus
     created_at: datetime
+
+    # Latest scan summary — populated by list endpoint JOIN; None if no scans yet
+    latest_scan_id: uuid.UUID | None = None
+    latest_scan_grade: str | None = None
+    latest_scan_score: float | None = None

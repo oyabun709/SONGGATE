@@ -52,9 +52,9 @@ def _ensure_mb_configured() -> None:
     global _MB_CONFIGURED
     if not _MB_CONFIGURED:
         musicbrainzngs.set_useragent(
-            "ropqa",
+            "songgate",
             "1.0",
-            "https://github.com/your-org/ropqa",  # replace with real contact URL
+            "https://songgate.vercel.app",
         )
         musicbrainzngs.set_rate_limit(limit_or_interval=1.0, new_requests=1)
         _MB_CONFIGURED = True
@@ -366,7 +366,7 @@ class MusicBrainzEnricher:
         """
         data = musicbrainzngs.get_recordings_by_isrc(
             isrc,
-            includes=["artist-credits", "releases", "work-rels", "tags"],
+            includes=["artists", "releases", "work-rels", "tags"],
         )
         recordings = data.get("isrc", {}).get("recording-list", [])
         if not recordings:

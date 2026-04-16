@@ -124,7 +124,7 @@ export default function SettingsPage() {
     setNotifSaving(true);
     try {
       const token = await getToken();
-      await fetch(`${API_BASE}/settings/notification-email`, {
+      await fetch(`${API_BASE}/billing/notification-email`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

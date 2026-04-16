@@ -1,25 +1,20 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { OrgActivator } from "@/components/auth/org-activator";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Belt-and-suspenders server-side guard (middleware is the primary gate)
-  const { userId, orgId } = await auth();
+  const { userId } = await auth();
   if (!userId) redirect("/sign-in");
-  if (!orgId) redirect("/org-selection");
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
-      <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
-      </div>
-    </div>
+    <>
+      <OrgActivator />
+      <DashboardShell>{children}</DashboardShell>
+    </>
   );
 }
