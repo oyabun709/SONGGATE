@@ -188,7 +188,7 @@ function PlanCard({
 
       {isEnterprise ? (
         <a
-          href="mailto:sales@songgate.io"
+          href="mailto:andrew@housesonhills.io"
           className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           Contact sales <ArrowRight className="h-3.5 w-3.5" />

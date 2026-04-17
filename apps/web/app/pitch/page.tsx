@@ -37,6 +37,12 @@ const SLIDES = [
 // ─── Individual slides ────────────────────────────────────────────────────────
 
 function Slide01Cover() {
+  const [copied, setCopied] = useState(false);
+  function copyEmail() {
+    navigator.clipboard.writeText("andrew@housesonhills.io").catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
   return (
     <div className="flex flex-col items-center justify-center h-full text-center gap-6 sm:gap-8">
       <div className="flex items-center gap-3 mb-1">
@@ -49,21 +55,26 @@ function Slide01Cover() {
         <span className="text-white font-medium">Catch errors before they cost you.</span>
       </p>
       <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full sm:w-auto px-4 sm:px-0">
-        <Link
-          href="/sign-up"
-          className="flex items-center justify-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-white"
+        <button
+          onClick={copyEmail}
+          className="flex items-center justify-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-white transition-opacity"
           style={{ background: ACCENT }}
         >
-          Start free trial <ArrowRight className="h-4 w-4" />
-        </Link>
+          {copied ? "Email copied!" : <>Book a demo <ArrowRight className="h-4 w-4" /></>}
+        </button>
         <Link
-          href="/sign-up"
+          href="/onboarding"
           className="flex items-center justify-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-slate-300 border border-slate-700 hover:border-slate-500 transition-colors"
         >
-          View live product
+          See live product
         </Link>
       </div>
-      <p className="text-xs text-slate-500">No credit card required · Cancel anytime</p>
+      <p className="text-xs text-slate-500 mt-1">
+        or reach us at{" "}
+        <a href="mailto:andrew@housesonhills.io" className="underline hover:text-slate-300 transition-colors">
+          andrew@housesonhills.io
+        </a>
+      </p>
     </div>
   );
 }
@@ -345,28 +356,22 @@ function Slide07BusinessModel() {
   const tiers = [
     {
       name: "Starter",
-      price: "$500",
-      unit: "/mo",
-      scans: "50 scans / month",
-      arr: "$6K ARR",
+      target: "Indie labels & small distributors",
+      scans: "Up to 50 scans / month",
       features: ["DDEX + metadata validation", "Dashboard access", "PDF reports"],
       highlight: false,
     },
     {
       name: "Professional",
-      price: "$2,000",
-      unit: "/mo",
-      scans: "500 scans / month",
-      arr: "$24K ARR",
+      target: "Mid-size distributors & rights admins",
+      scans: "Up to 500 scans / month",
       features: ["All 5 validation layers", "REST API access", "Analytics dashboard", "Team seats"],
       highlight: true,
     },
     {
       name: "Enterprise",
-      price: "$8,000+",
-      unit: "/mo",
+      target: "Large distributors & catalog managers",
       scans: "Unlimited scans",
-      arr: "$96K+ ARR",
       features: ["Batch API (100 releases/req)", "White-label PDF reports", "SLA + dedicated support"],
       highlight: false,
     },
@@ -375,8 +380,9 @@ function Slide07BusinessModel() {
   return (
     <div className="flex flex-col h-full justify-center gap-4 sm:gap-6">
       <h2 className="text-2xl sm:text-4xl font-bold text-center">Business Model</h2>
+      <p className="text-center text-slate-400 text-sm sm:text-base -mt-2">Tiered SaaS subscription — priced by scan volume and team size</p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5 max-w-4xl mx-auto w-full">
-        {tiers.map(({ name, price, unit, scans, arr, features, highlight }) => (
+        {tiers.map(({ name, target, scans, features, highlight }) => (
           <div
             key={name}
             className="rounded-xl border p-4 sm:p-5 flex flex-col gap-2 sm:gap-3"
@@ -390,15 +396,9 @@ function Slide07BusinessModel() {
                 Most popular
               </div>
             )}
-            <div className="text-sm font-semibold text-slate-400">{name}</div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black text-white">{price}</span>
-              <span className="text-sm text-slate-500">{unit}</span>
-            </div>
+            <div className="text-sm font-semibold text-white">{name}</div>
+            <div className="text-xs text-slate-400 leading-snug">{target}</div>
             <div className="text-xs text-slate-500">{scans}</div>
-            <div className="text-xs font-semibold rounded px-2 py-1 text-center" style={{ background: `${ACCENT}22`, color: ACCENT }}>
-              {arr} per customer
-            </div>
             <ul className="space-y-1.5 mt-1">
               {features.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-xs text-slate-400">
@@ -411,9 +411,9 @@ function Slide07BusinessModel() {
         ))}
       </div>
       <div className="max-w-4xl mx-auto w-full rounded-lg border border-slate-800 bg-white/[0.02] px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 sm:gap-0">
-        <span className="text-xs sm:text-sm text-slate-400">Path to $100K ARR</span>
+        <span className="text-xs sm:text-sm text-slate-400">Revenue model</span>
         <span className="text-xs sm:text-sm text-white font-medium">
-          1 Enterprise + 1 Professional + 2 Starter accounts
+          Annual contracts · Usage-based overages · Professional services
         </span>
       </div>
     </div>
@@ -556,6 +556,12 @@ function Slide09Acquisition() {
 }
 
 function Slide10Ask() {
+  const [copied, setCopied] = useState(false);
+  function copyEmail() {
+    navigator.clipboard.writeText("andrew@housesonhills.io").catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
   const rows = [
     {
       type: "Pilot",
@@ -607,16 +613,19 @@ function Slide10Ask() {
         ))}
       </div>
       <div className="flex justify-center mt-1 sm:mt-2">
-        <Link
-          href="/sign-up"
-          className="flex items-center gap-2 rounded-lg px-6 sm:px-8 py-3 sm:py-3.5 text-sm font-semibold text-white shadow-lg"
+        <button
+          onClick={copyEmail}
+          className="flex items-center gap-2 rounded-lg px-6 sm:px-8 py-3 sm:py-3.5 text-sm font-semibold text-white shadow-lg transition-opacity"
           style={{ background: ACCENT }}
         >
-          Start your pilot today <ArrowRight className="h-4 w-4" />
-        </Link>
+          {copied ? "Email copied!" : <>Get in touch <ArrowRight className="h-4 w-4" /></>}
+        </button>
       </div>
       <p className="text-center text-xs text-slate-600">
-        andrew@housesonhills.io · songgate.io
+        <a href="mailto:andrew@housesonhills.io" className="underline hover:text-slate-400 transition-colors">
+          andrew@housesonhills.io
+        </a>
+        {" "}· songgate.io
       </p>
     </div>
   );
