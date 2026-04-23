@@ -399,11 +399,12 @@ export default function DemoPage() {
   const [uploadedFile, setUploadedFile] = useState<{ name: string; content: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Register devtools alert
+  // Register devtools alert + right-click protection
   useEffect(() => {
     window.__demoProtectionAlert = () => setDevtoolsNotice(true);
     return () => { delete window.__demoProtectionAlert; };
   }, []);
+  useDevtoolsProtection();
 
   // Check localStorage for prior terms acceptance
   useEffect(() => {
@@ -487,6 +488,13 @@ export default function DemoPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setScanError(null);
+
+    // Reject files over 5 MB
+    if (file.size > 5 * 1024 * 1024) {
+      setScanError("File too large. Maximum upload size is 5 MB.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
 
     // Detect format from filename for the loading animation
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "xml";
@@ -849,6 +857,8 @@ export default function DemoPage() {
                 </Link>
                 <a
                   href="mailto:andrew@housesonhills.io?subject=SONGGATE Pilot&body=Hi, I'd like to book a call to discuss a SONGGATE pilot."
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
                   Book a pilot call

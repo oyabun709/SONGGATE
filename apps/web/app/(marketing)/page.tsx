@@ -108,7 +108,7 @@ export default function LandingPage() {
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-lg text-slate-500">
           Pre-flight every release before delivery. SONGGATE runs 40+ validation
-          rules across DDEX structure, metadata, artwork, audio, and fraud
+          rules across DDEX structure, metadata, artwork, and fraud
           signals — and scores your readiness for every major DSP.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
