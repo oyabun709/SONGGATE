@@ -185,7 +185,7 @@ class JSONParser:
         # --- optional release fields ---
         for opt in (
             "release_type", "genre", "parental_warning",
-            "c_line", "p_line", "language",
+            "c_line", "p_line", "language", "publisher",
         ):
             val = raw.get(opt)
             if val is not None:

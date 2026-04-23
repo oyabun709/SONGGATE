@@ -349,7 +349,7 @@ def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
                     "parental_warning": rel.get("parental_warning", ""),
                     "tracks": rel.get("tracks", []),
                     "isrc_list": [t.get("isrc", "") for t in rel.get("tracks", []) if t.get("isrc")],
-                    "publisher": "",
+                    "publisher": rel.get("publisher", ""),
                 }
         except Exception as exc:
             logger.warning("Demo JSON layer error: %s", exc)
