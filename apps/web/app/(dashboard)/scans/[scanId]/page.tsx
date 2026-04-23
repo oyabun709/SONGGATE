@@ -505,7 +505,7 @@ export default function ScanResultsPage() {
             <div>
               <h2 className="text-sm font-semibold text-slate-800">Score Breakdown by Layer</h2>
               <p className="mt-0.5 text-xs text-slate-400">
-                Score reflects unresolved findings only. Audio results update asynchronously.
+                Score reflects unresolved findings only.
               </p>
             </div>
 
