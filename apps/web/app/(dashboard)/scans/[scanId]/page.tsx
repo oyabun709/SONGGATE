@@ -31,12 +31,11 @@ const LAYER_LABELS: Record<string, string> = {
   ddex: "DDEX / Format",
   metadata: "DSP Metadata Rules",
   fraud: "Fraud Screening",
-  audio: "Audio QA",
   artwork: "Artwork Validation",
   enrichment: "MusicBrainz Enrichment",
 };
 
-const LAYER_ORDER = ["ddex", "metadata", "fraud", "audio", "artwork", "enrichment"];
+const LAYER_ORDER = ["ddex", "metadata", "fraud", "artwork", "enrichment"];
 
 const SEV_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
 

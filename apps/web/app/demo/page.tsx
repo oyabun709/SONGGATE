@@ -71,7 +71,6 @@ function getLayerSteps(fmt: string) {
     { key: "ddex",     label: FORMAT_STEP_LABEL[fmt] ?? "Format Validation", duration: 800 },
     { key: "metadata", label: "DSP Metadata Rules",                           duration: 900 },
     { key: "fraud",    label: "Fraud Pre-Screening",                          duration: 1100 },
-    { key: "audio",    label: "Audio QA",                                     duration: 1300 },
     { key: "artwork",  label: "Metadata Enrichment",                          duration: 700 },
   ];
 }
@@ -81,7 +80,6 @@ function getLayerLabels(fmt: string): Record<string, string> {
     ddex:     FORMAT_LAYER_LABEL[fmt] ?? "Format Validation",
     metadata: "DSP Metadata Rules",
     fraud:    "Fraud Screening",
-    audio:    "Audio QA",
     artwork:  "Artwork Validation",
   };
 }
@@ -589,7 +587,7 @@ export default function DemoPage() {
     return groups;
   }
 
-  const layers = ["ddex", "metadata", "fraud", "audio", "artwork"];
+  const layers = ["ddex", "metadata", "fraud", "artwork"];
   const layerLabels = getLayerLabels(scanResult?.file_format ?? scanFormat);
 
   // ── Render ────────────────────────────────────────────────────────────────

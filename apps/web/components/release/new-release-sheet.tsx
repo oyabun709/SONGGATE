@@ -192,13 +192,6 @@ export function NewReleaseSheet() {
 
               <section className="space-y-2">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  Audio
-                </h3>
-                <UploadZone releaseId={releaseId} fileType="audio" />
-              </section>
-
-              <section className="space-y-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Artwork
                 </h3>
                 <UploadZone releaseId={releaseId} fileType="artwork" />

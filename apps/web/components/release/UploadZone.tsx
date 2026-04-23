@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   XCircle,
   FileArchive,
-  Music2,
   Image,
   Loader2,
 } from "lucide-react";
@@ -16,7 +15,7 @@ import { cn } from "@/lib/utils";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
-export type FileType = "ddex_package" | "audio" | "artwork";
+export type FileType = "ddex_package" | "artwork";
 
 interface UploadZoneProps {
   releaseId: string;
@@ -67,21 +66,6 @@ const TYPE_CONFIG: Record<
       "application/x-zip-compressed": [".zip"],
       "text/xml": [".xml"],
       "application/xml": [".xml"],
-    },
-  },
-  audio: {
-    label: "Audio",
-    hint: ".wav, .flac, .aiff, .mp3 · max 2 GB",
-    icon: Music2,
-    maxSize: 2 * GB,
-    accept: {
-      "audio/wav": [".wav"],
-      "audio/x-wav": [".wav"],
-      "audio/flac": [".flac"],
-      "audio/x-flac": [".flac"],
-      "audio/aiff": [".aiff", ".aif"],
-      "audio/x-aiff": [".aiff", ".aif"],
-      "audio/mpeg": [".mp3"],
     },
   },
   artwork: {

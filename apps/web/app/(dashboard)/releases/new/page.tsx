@@ -22,7 +22,6 @@ const LAYERS = [
   { id: "ddex", label: "DDEX / Format validation", desc: "Schema, required elements, ISRC format" },
   { id: "metadata", label: "DSP metadata rules", desc: "Publisher, artwork specs, copyright lines" },
   { id: "fraud", label: "Fraud pre-screening", desc: "Artist similarity, velocity, AI indicators" },
-  { id: "audio", label: "Audio QA", desc: "Loudness, true peak, sample rate, clipping" },
   { id: "artwork", label: "Artwork validation", desc: "Resolution, color space, format, DPI" },
   { id: "enrichment", label: "MusicBrainz enrichment", desc: "Composer, ISWC, label suggestions" },
 ];
@@ -581,7 +580,7 @@ export default function NewScanPage() {
           <div className="rounded-lg border border-slate-200 bg-white p-5">
             <h3 className="mb-3 text-sm font-semibold text-slate-800">Scan Layers</h3>
             <p className="mb-4 text-xs text-slate-400">
-              Choose which QA layers to run. Audio and enrichment add latency.
+              Choose which QA layers to run. Enrichment adds latency.
             </p>
             <div className="space-y-2">
               {LAYERS.map((layer) => {
