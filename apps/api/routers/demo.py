@@ -486,6 +486,48 @@ def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
         _title = filename.rsplit(".", 1)[0]
     release_title = _title or "Uploaded Release"
 
+    # ── Validated fields (shown as green checks on PASS scans) ────────────────
+    def _field(label: str, value: Any, fmt: str = "text") -> dict[str, Any] | None:
+        """Return a validated field entry, or None if value is empty/falsy."""
+        if value is None or value == "" or value == 0:
+            return None
+        return {"label": label, "value": value, "format": fmt}
+
+    tracks_data_vf = parsed_meta.get("tracks", [])
+    isrc_list_vf   = parsed_meta.get("isrc_list", [])
+
+    # Build track summary lines (e.g. "Track 1: Luminous Decay — USPR12600001")
+    track_lines: list[str] = []
+    for i, t in enumerate(tracks_data_vf, 1):
+        parts = [f"Track {i}"]
+        if t.get("title"):
+            parts.append(t["title"])
+        if t.get("isrc"):
+            parts.append(t["isrc"])
+        track_lines.append(" — ".join(parts))
+
+    raw_validated = [
+        _field("Release Title",     release_title),
+        _field("Artist",            parsed_meta.get("artist")),
+        _field("Label",             parsed_meta.get("label")),
+        _field("Release Type",      parsed_meta.get("release_type")),
+        _field("Genre",             parsed_meta.get("genre")),
+        _field("Release Date",      parsed_meta.get("release_date")),
+        _field("UPC / Barcode",     parsed_meta.get("upc")),
+        _field("P-Line",            parsed_meta.get("p_line")),
+        _field("C-Line",            parsed_meta.get("c_line")),
+        _field("Parental Warning",  parsed_meta.get("parental_warning")),
+        _field("Territory",         parsed_meta.get("territory")),
+        _field("Publisher",         parsed_meta.get("publisher")),
+        _field("Track Count",       len(tracks_data_vf) if tracks_data_vf else None),
+        _field("ISRCs",             ", ".join(isrc_list_vf) if isrc_list_vf else None),
+        _field("Tracks",            track_lines, fmt="list") if track_lines else None,
+        _field("Artwork",
+               f"{artwork_width}×{artwork_height} px"
+               if artwork_width and artwork_height else None),
+    ]
+    validated_fields = [f for f in raw_validated if f is not None]
+
     return {
         "scan_id": scan_id,
         "demo": True,
@@ -502,6 +544,7 @@ def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
         "results": results,
         "release_title": release_title,
         "release_artist": parsed_meta.get("artist", ""),
+        "validated_fields": validated_fields,
         "completed_at": now,
     }
 
