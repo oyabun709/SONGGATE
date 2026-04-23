@@ -706,7 +706,11 @@ export default function DemoPage() {
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
                 <h1 className="text-2xl font-semibold text-slate-900">
-                  {scanResult.release_title || "Scan Results"}
+                  {(scanResult.release_title && scanResult.release_title !== "Uploaded Release")
+                    ? scanResult.release_title
+                    : uploadedFile
+                    ? uploadedFile.name.replace(/\.[^.]+$/, "")
+                    : scanResult.release_title || "Scan Results"}
                   {scanResult.release_artist && (
                     <span className="ml-2 text-lg font-normal text-slate-500">
                       — {scanResult.release_artist}

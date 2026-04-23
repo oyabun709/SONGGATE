@@ -480,6 +480,12 @@ def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
     score = round(max(0.0, 100.0 - deductions), 1)
     grade = "PASS" if score >= 80 else ("WARN" if score >= 60 else "FAIL")
 
+    # Title fallback chain: parsed metadata → filename stem → "Uploaded Release"
+    _title = parsed_meta.get("title", "")
+    if not _title and filename:
+        _title = filename.rsplit(".", 1)[0]
+    release_title = _title or "Uploaded Release"
+
     return {
         "scan_id": scan_id,
         "demo": True,
@@ -494,7 +500,7 @@ def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
         "total_issues": critical + warnings + info,
         "layers_run": ["ddex", "metadata", "fraud", "artwork"],
         "results": results,
-        "release_title": parsed_meta.get("title", "Uploaded Release"),
+        "release_title": release_title,
         "release_artist": parsed_meta.get("artist", ""),
         "completed_at": now,
     }
