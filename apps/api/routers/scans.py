@@ -585,6 +585,136 @@ async def get_scan_report(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# GET /scans/{scan_id}/export/csv
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/scans/{scan_id}/export/csv")
+async def export_scan_csv(
+    scan_id: str,
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+):
+    """
+    Export scan results as a flat CSV file.
+
+    Columns: rule_id, layer, severity, message, fix_hint, dsp_targets, resolved
+    """
+    import csv as csv_mod
+
+    scan = await _get_scan_for_org(db, scan_id, org.id)
+    if not scan:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Scan not found")
+    if scan.status != "complete":
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Scan is not complete.")
+
+    release_result = await db.execute(select(Release).where(Release.id == scan.release_id))
+    release = release_result.scalar_one_or_none()
+
+    results_query = await db.execute(
+        select(ScanResult)
+        .where(ScanResult.scan_id == uuid.UUID(scan_id))
+        .order_by(ScanResult.severity, ScanResult.layer)
+    )
+    all_results = list(results_query.scalars().all())
+
+    output = io.StringIO()
+    writer = csv_mod.writer(output)
+    writer.writerow(["rule_id", "layer", "severity", "message", "fix_hint", "dsp_targets", "resolved"])
+    for r in all_results:
+        if r.status == "pass":
+            continue
+        writer.writerow([
+            r.rule_id,
+            r.layer,
+            r.severity,
+            r.message,
+            r.fix_hint or "",
+            ",".join(r.dsp_targets or []),
+            "yes" if r.resolved else "no",
+        ])
+
+    safe_title = re.sub(r"[^\w\-]", "_", release.title if release else "scan")[:60]
+    date_str = (scan.completed_at or scan.created_at).strftime("%Y-%m-%d")
+    filename = f"SONGGATE_{safe_title}_{date_str}.csv"
+
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode("utf-8")),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GET /scans/{scan_id}/export/json
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/scans/{scan_id}/export/json")
+async def export_scan_json(
+    scan_id: str,
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+):
+    """
+    Export full scan result as a JSON file.
+    """
+    import json as json_mod
+
+    scan = await _get_scan_for_org(db, scan_id, org.id)
+    if not scan:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Scan not found")
+    if scan.status != "complete":
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Scan is not complete.")
+
+    release_result = await db.execute(select(Release).where(Release.id == scan.release_id))
+    release = release_result.scalar_one_or_none()
+
+    results_query = await db.execute(
+        select(ScanResult)
+        .where(ScanResult.scan_id == uuid.UUID(scan_id))
+        .order_by(ScanResult.severity, ScanResult.layer)
+    )
+    all_results = list(results_query.scalars().all())
+
+    payload = {
+        "scan_id": scan_id,
+        "release_title": release.title if release else "",
+        "release_artist": release.artist if release else "",
+        "upc": release.upc if release else "",
+        "readiness_score": scan.readiness_score,
+        "grade": scan.grade.value if scan.grade else "FAIL",
+        "critical_count": scan.critical_count,
+        "warning_count": scan.warning_count,
+        "info_count": scan.info_count,
+        "completed_at": (scan.completed_at or scan.created_at).isoformat(),
+        "results": [
+            {
+                "rule_id": r.rule_id,
+                "layer": r.layer,
+                "severity": r.severity,
+                "message": r.message,
+                "fix_hint": r.fix_hint,
+                "actual_value": r.actual_value,
+                "field_path": r.field_path,
+                "dsp_targets": list(r.dsp_targets or []),
+                "resolved": r.resolved,
+            }
+            for r in all_results
+            if r.status != "pass"
+        ],
+    }
+
+    safe_title = re.sub(r"[^\w\-]", "_", release.title if release else "scan")[:60]
+    date_str = (scan.completed_at or scan.created_at).strftime("%Y-%m-%d")
+    filename = f"SONGGATE_{safe_title}_{date_str}.json"
+
+    return StreamingResponse(
+        io.BytesIO(json_mod.dumps(payload, indent=2).encode("utf-8")),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # POST /scans/{scan_id}/report/regenerate
 # ──────────────────────────────────────────────────────────────────────────────
 

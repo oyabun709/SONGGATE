@@ -264,6 +264,8 @@ export default function ScanResultsPage() {
   const [pollingFor, setPollingFor] = useState(true);
   const [token, setToken] = useState<string>("");
   const [reportLoading, setReportLoading] = useState(false);
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [jsonLoading, setJsonLoading] = useState(false);
 
   const fetchScan = useCallback(async (tok?: string) => {
     const t = tok ?? token;
@@ -340,6 +342,32 @@ export default function ScanResultsPage() {
     }
   }
 
+  async function handleExport(format: "csv" | "json") {
+    if (!token || !scan || scan.status !== "complete") return;
+    const setLoading = format === "csv" ? setCsvLoading : setJsonLoading;
+    setLoading(true);
+    try {
+      const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      const res = await fetch(`${API}/scans/${params.scanId}/export/${format}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = res.headers.get("content-disposition") ?? "";
+      const match = cd.match(/filename="([^"]+)"/);
+      a.download = match?.[1] ?? `SONGGATE_scan_${params.scanId.slice(0, 8)}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch { /* noop */ } finally {
+      setLoading(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -407,6 +435,22 @@ export default function ScanResultsPage() {
             Re-scan
           </button>
           <button
+            onClick={() => handleExport("csv")}
+            disabled={csvLoading || !scan || scan.status !== "complete"}
+            className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {csvLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            CSV
+          </button>
+          <button
+            onClick={() => handleExport("json")}
+            disabled={jsonLoading || !scan || scan.status !== "complete"}
+            className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {jsonLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            JSON
+          </button>
+          <button
             onClick={handleDownloadReport}
             disabled={reportLoading || !scan || scan.status !== "complete"}
             className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
@@ -419,7 +463,7 @@ export default function ScanResultsPage() {
             ) : (
               <>
                 <Download className="h-3.5 w-3.5" />
-                Export PDF
+                PDF
               </>
             )}
           </button>

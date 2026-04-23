@@ -36,6 +36,7 @@ interface DemoResult {
 interface DemoScan {
   scan_id: string;
   demo: boolean;
+  file_format: "xml" | "csv" | "json";
   watermark: string;
   status: string;
   readiness_score: number;
@@ -504,6 +505,51 @@ export default function DemoPage() {
     URL.revokeObjectURL(url);
   }
 
+  // ── Demo CSV export ───────────────────────────────────────────────────────
+
+  function exportDemoCSV() {
+    if (!scanResult) return;
+    const date = new Date().toISOString().slice(0, 10);
+    const safe = (scanResult.release_title || "scan").replace(/[^\w-]/g, "_").slice(0, 60);
+    const filename = `SONGGATE_DEMO_${safe}_${date}.csv`;
+    const rows = [
+      ["rule_name", "layer", "severity", "message", "fix_hint", "dsp_targets"],
+      ...scanResult.results.map((r) => [
+        r.rule_name,
+        r.layer,
+        r.severity,
+        r.message,
+        r.fix_hint ?? "",
+        r.dsp_targets.join(","),
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Demo JSON export ──────────────────────────────────────────────────────
+
+  function exportDemoJSON() {
+    if (!scanResult) return;
+    const date = new Date().toISOString().slice(0, 10);
+    const safe = (scanResult.release_title || "scan").replace(/[^\w-]/g, "_").slice(0, 60);
+    const filename = `SONGGATE_DEMO_${safe}_${date}.json`;
+    const payload = {
+      ...scanResult,
+      watermark: "SONGGATE Demo — Not for redistribution · songgate.io",
+      exported_at: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ── Results grouping ──────────────────────────────────────────────────────
 
   function groupedResults() {
@@ -582,7 +628,7 @@ export default function DemoPage() {
 
               <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
                 <Upload className="h-4 w-4" />
-                Upload your own DDEX or CSV
+                Upload your file
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -595,7 +641,7 @@ export default function DemoPage() {
           )}
 
           <p className="mt-4 text-xs text-slate-400">
-            No account required. Your files are not stored.
+            Work with three supported formats: DDEX XML, CSV, and JSON. Your files are not stored.
           </p>
 
           {/* Scanning animation */}
@@ -642,6 +688,20 @@ export default function DemoPage() {
                 >
                   ← New scan
                 </button>
+                <button
+                  onClick={exportDemoCSV}
+                  className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  <Download className="h-3 w-3" />
+                  CSV
+                </button>
+                <button
+                  onClick={exportDemoJSON}
+                  className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  <Download className="h-3 w-3" />
+                  JSON
+                </button>
                 {uploadedFile ? (
                   <button
                     onClick={downloadFile}
@@ -656,7 +716,7 @@ export default function DemoPage() {
                     className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
                   >
                     <Lock className="h-3 w-3" />
-                    Create account to export
+                    Create account for PDF
                   </Link>
                 )}
               </div>

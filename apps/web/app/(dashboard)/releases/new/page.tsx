@@ -395,7 +395,7 @@ export default function NewScanPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">New Scan</h1>
         <p className="mt-0.5 text-sm text-slate-500">
-          Upload a release package and run the full 5-layer QA pipeline.
+          Work with three supported formats: DDEX XML, CSV, and JSON.
         </p>
       </div>
 

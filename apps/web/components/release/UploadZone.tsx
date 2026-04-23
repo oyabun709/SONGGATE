@@ -59,7 +59,7 @@ const TYPE_CONFIG: Record<
 > = {
   ddex_package: {
     label: "DDEX Package",
-    hint: ".zip or .xml · max 500 MB",
+    hint: "Work with three supported formats: DDEX XML, CSV, and JSON. · max 500 MB",
     icon: FileArchive,
     maxSize: 500 * MB,
     accept: {

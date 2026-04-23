@@ -29,7 +29,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.responses import JSONResponse
 
+from config.file_types import detect_format
 from services.ddex.validator import DDEXValidator, DDEXParser
+from services.ddex.csv_parser import CSVParser
+from services.ddex.json_parser import JSONParser
 from services.fraud.screener import FraudScreener, VelocityContext
 from services.metadata.rules_engine import DSPRulesEngine, ReleaseMetadata
 
@@ -226,6 +229,8 @@ _MINIMAL_DEMO_XML = """\
 # ── Demo services (module-level singletons, no DB) ────────────────────────────
 
 _ddex_validator = DDEXValidator()
+_csv_parser     = CSVParser()
+_json_parser    = JSONParser()
 _rules_engine   = DSPRulesEngine()
 _fraud_screener = FraudScreener()
 
@@ -236,9 +241,9 @@ def _sanitise_rule_id(rule_id: str) -> str:
     return " — ".join(p.title() for p in parts)
 
 
-def _run_in_memory_scan(content: bytes) -> dict[str, Any]:
+def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
     """
-    Run all applicable QA layers on raw DDEX bytes.
+    Run all applicable QA layers on raw metadata bytes (XML, CSV, or JSON).
     Returns a dict matching the DemoScanResult schema.
     No database access, no file storage.
     """
@@ -246,34 +251,112 @@ def _run_in_memory_scan(content: bytes) -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat()
     results: list[dict[str, Any]] = []
 
-    # ── Layer 1: DDEX Validation ───────────────────────────────────────────────
-    try:
-        ddex_findings = _ddex_validator.validate(content)
-        for f in ddex_findings:
-            results.append({
-                "id": str(uuid.uuid4()),
-                "layer": "ddex",
-                "rule_name": _sanitise_rule_id(f.rule_id),
-                "severity": f.severity,
-                "message": f.message,
-                "field_path": getattr(f, "field_path", None),
-                "actual_value": getattr(f, "actual_value", None),
-                "fix_hint": getattr(f, "fix_hint", None),
-                "dsp_targets": [],
-            })
-    except Exception as exc:
-        logger.warning("Demo DDEX layer error: %s", exc)
+    fmt = detect_format(content, filename)
 
-    # ── Parse metadata for layers 2 & 3 ───────────────────────────────────────
+    # ── Layer 1: Format validation ─────────────────────────────────────────────
     parsed_meta: dict[str, Any] = {}
-    try:
-        parser = DDEXParser()
-        parsed_meta = parser.extract_metadata(content) or {}
-    except Exception as exc:
-        logger.warning("Demo metadata parse error: %s", exc)
+
+    if fmt == "xml":
+        # DDEX XML: full validator + parser
+        try:
+            ddex_findings = _ddex_validator.validate(content)
+            for f in ddex_findings:
+                results.append({
+                    "id": str(uuid.uuid4()),
+                    "layer": "ddex",
+                    "rule_name": _sanitise_rule_id(f.rule_id),
+                    "severity": f.severity,
+                    "message": f.message,
+                    "field_path": getattr(f, "field_path", None),
+                    "actual_value": getattr(f, "actual_value", None),
+                    "fix_hint": getattr(f, "fix_hint", None),
+                    "dsp_targets": [],
+                })
+        except Exception as exc:
+            logger.warning("Demo DDEX layer error: %s", exc)
+        try:
+            parsed_meta = DDEXParser().extract_metadata(content) or {}
+        except Exception as exc:
+            logger.warning("Demo XML parse error: %s", exc)
+
+    elif fmt == "csv":
+        # CSV: structural parse findings + convert first release to parsed_meta
+        try:
+            csv_result = _csv_parser.parse(content)
+            for f in csv_result.findings:
+                results.append({
+                    "id": str(uuid.uuid4()),
+                    "layer": "ddex",
+                    "rule_name": _sanitise_rule_id(f.rule_id),
+                    "severity": f.severity,
+                    "message": f.message,
+                    "field_path": getattr(f, "field_path", None),
+                    "actual_value": getattr(f, "actual_value", None),
+                    "fix_hint": getattr(f, "fix_hint", None),
+                    "dsp_targets": [],
+                })
+            if csv_result.releases:
+                rel = csv_result.releases[0]
+                parsed_meta = {
+                    "title": rel.get("title", ""),
+                    "artist": rel.get("artist", ""),
+                    "upc": rel.get("upc", ""),
+                    "label": rel.get("label", ""),
+                    "release_date": rel.get("release_date", ""),
+                    "release_type": rel.get("release_type", ""),
+                    "genre": rel.get("genre", ""),
+                    "c_line": rel.get("c_line", ""),
+                    "p_line": rel.get("p_line", ""),
+                    "parental_warning": rel.get("parental_warning", ""),
+                    "tracks": rel.get("tracks", []),
+                    "isrc_list": [t.get("isrc", "") for t in rel.get("tracks", []) if t.get("isrc")],
+                    "publisher": next(
+                        (t.get("composer", "") for t in rel.get("tracks", []) if t.get("composer")),
+                        "",
+                    ),
+                }
+        except Exception as exc:
+            logger.warning("Demo CSV layer error: %s", exc)
+
+    elif fmt == "json":
+        # JSON: structural parse findings + convert first release to parsed_meta
+        try:
+            json_result = _json_parser.parse(content)
+            for f in json_result.findings:
+                results.append({
+                    "id": str(uuid.uuid4()),
+                    "layer": "ddex",
+                    "rule_name": _sanitise_rule_id(f.rule_id),
+                    "severity": f.severity,
+                    "message": f.message,
+                    "field_path": getattr(f, "field_path", None),
+                    "actual_value": getattr(f, "actual_value", None),
+                    "fix_hint": getattr(f, "fix_hint", None),
+                    "dsp_targets": [],
+                })
+            if json_result.releases:
+                rel = json_result.releases[0]
+                parsed_meta = {
+                    "title": rel.get("title", ""),
+                    "artist": rel.get("artist", ""),
+                    "upc": rel.get("upc", ""),
+                    "label": rel.get("label", ""),
+                    "release_date": rel.get("release_date", ""),
+                    "release_type": rel.get("release_type", ""),
+                    "genre": rel.get("genre", ""),
+                    "c_line": rel.get("c_line", ""),
+                    "p_line": rel.get("p_line", ""),
+                    "parental_warning": rel.get("parental_warning", ""),
+                    "tracks": rel.get("tracks", []),
+                    "isrc_list": [t.get("isrc", "") for t in rel.get("tracks", []) if t.get("isrc")],
+                    "publisher": "",
+                }
+        except Exception as exc:
+            logger.warning("Demo JSON layer error: %s", exc)
 
     tracks_data = parsed_meta.get("tracks", [])
     isrc_list   = parsed_meta.get("isrc_list", [])
+    file_format = fmt
 
     # Check artwork dimensions from parsed metadata
     artwork_width  = int(parsed_meta.get("artwork_width", 0) or 0)
@@ -399,6 +482,7 @@ def _run_in_memory_scan(content: bytes) -> dict[str, Any]:
     return {
         "scan_id": scan_id,
         "demo": True,
+        "file_format": file_format,
         "watermark": "SONGGATE Demo — songgate.io",
         "status": "complete",
         "readiness_score": score,
@@ -435,10 +519,12 @@ async def demo_scan(
         content = await file.read()
         if len(content) > 5 * 1024 * 1024:  # 5 MB hard cap
             raise HTTPException(status_code=413, detail="File too large (max 5 MB).")
+        filename = file.filename or ""
     else:
         content = _load_sample_xml()
+        filename = "sample-release.xml"
 
-    result = _run_in_memory_scan(content)
+    result = _run_in_memory_scan(content, filename=filename)
 
     logger.info(
         "demo_scan ip_hash=%s grade=%s issues=%d",
