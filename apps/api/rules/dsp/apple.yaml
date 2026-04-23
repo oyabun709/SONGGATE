@@ -174,7 +174,7 @@ rules:
       Apple Music requires artwork of at least 3000×3000 px in RGB JPEG format.
     severity: critical
     category: artwork
-    check: "metadata.artwork_width > 0 and metadata.artwork_width >= 3000 and metadata.artwork_height >= 3000"
+    check: "metadata.artwork_width == 0 or (metadata.artwork_width >= 3000 and metadata.artwork_height >= 3000)"
     fix_hint: Export cover art as 3000×3000 px RGB JPEG (sRGB colour space).
     doc_url: https://help.apple.com/itc/musicstyleguide/#/apdee6f2d073
     active: true

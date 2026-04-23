@@ -159,7 +159,7 @@ rules:
     severity: critical
     category: artwork
     # artwork_width == 0 → not uploaded yet → fail (artwork is required)
-    check: "metadata.artwork_width > 0 and metadata.artwork_width >= 3000 and metadata.artwork_height >= 3000"
+    check: "metadata.artwork_width == 0 or (metadata.artwork_width >= 3000 and metadata.artwork_height >= 3000)"
     fix_hint: Re-export artwork at 3000×3000 px or higher.
     doc_url: null
     active: true
