@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronUp,
   Lock,
+  Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -374,6 +375,7 @@ export default function DemoPage() {
   const [scanResult, setScanResult]     = useState<DemoScan | null>(null);
   const [scanError, setScanError]       = useState<string | null>(null);
   const [devtoolsNotice, setDevtoolsNotice] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; content: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Register devtools alert
@@ -403,6 +405,7 @@ export default function DemoPage() {
   async function animateLayers(scanPromise: Promise<DemoScan>) {
     const completed = new Set<string>();
     setCompleted(new Set());
+    setScanResult(null);
     setPhase("scanning");
 
     let result: DemoScan | null = null;
@@ -463,6 +466,10 @@ export default function DemoPage() {
     if (!file) return;
     setScanError(null);
 
+    // Read and store file content for download later
+    const text = await file.text();
+    setUploadedFile({ name: file.name, content: text });
+
     const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     const fd  = new FormData();
     fd.append("file", file);
@@ -480,6 +487,21 @@ export default function DemoPage() {
     await animateLayers(promise);
     // Reset file input
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  // ── Download uploaded file ────────────────────────────────────────────────
+
+  function downloadFile() {
+    if (!uploadedFile) return;
+    const ext  = uploadedFile.name.split(".").pop()?.toLowerCase() ?? "xml";
+    const mime = ext === "json" ? "application/json" : ext === "csv" ? "text/csv" : "application/xml";
+    const blob = new Blob([uploadedFile.content], { type: mime });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = uploadedFile.name;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   // ── Results grouping ──────────────────────────────────────────────────────
@@ -615,19 +637,28 @@ export default function DemoPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setPhase("hero")}
+                  onClick={() => { setPhase("hero"); setUploadedFile(null); }}
                   className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
                 >
                   ← New scan
                 </button>
-                {/* Export disabled in demo */}
-                <Link
-                  href="/sign-up"
-                  className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
-                >
-                  <Lock className="h-3 w-3" />
-                  Create account to export
-                </Link>
+                {uploadedFile ? (
+                  <button
+                    onClick={downloadFile}
+                    className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                  >
+                    <Download className="h-3 w-3" />
+                    Download file
+                  </button>
+                ) : (
+                  <Link
+                    href="/sign-up"
+                    className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                  >
+                    <Lock className="h-3 w-3" />
+                    Create account to export
+                  </Link>
+                )}
               </div>
             </div>
 
