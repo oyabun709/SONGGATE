@@ -363,7 +363,9 @@ function layerScore(results: DemoResult[], layer: string): number {
   const layerResults = results.filter(r => r.layer === layer);
   const criticals    = layerResults.filter(r => r.severity === "critical").length;
   const warnings     = layerResults.filter(r => r.severity === "warning").length;
-  return Math.max(0, 100 - criticals * 20 - warnings * 7);
+  // Mirror backend formula: same deduction weights and caps
+  const deductions   = Math.min(criticals * 10, 60) + Math.min(warnings * 3, 25);
+  return Math.max(0, 100 - deductions);
 }
 
 function LayerMiniBar({ label, score }: { label: string; score: number }) {
