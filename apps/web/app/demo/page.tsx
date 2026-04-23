@@ -54,21 +54,37 @@ interface DemoScan {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const LAYER_STEPS = [
-  { key: "ddex",     label: "DDEX Validation",      duration: 800 },
-  { key: "metadata", label: "DSP Metadata Rules",    duration: 900 },
-  { key: "fraud",    label: "Fraud Pre-Screening",   duration: 1100 },
-  { key: "audio",    label: "Audio QA",              duration: 1300 },
-  { key: "artwork",  label: "Metadata Enrichment",   duration: 700 },
-];
-
-const LAYER_LABELS: Record<string, string> = {
-  ddex:      "DDEX / Format",
-  metadata:  "DSP Metadata Rules",
-  fraud:     "Fraud Screening",
-  audio:     "Audio QA",
-  artwork:   "Artwork Validation",
+const FORMAT_STEP_LABEL: Record<string, string> = {
+  csv:  "CSV Validation",
+  json: "JSON Validation",
+  xml:  "DDEX Validation",
 };
+
+const FORMAT_LAYER_LABEL: Record<string, string> = {
+  csv:  "CSV / Format",
+  json: "JSON / Format",
+  xml:  "DDEX / Format",
+};
+
+function getLayerSteps(fmt: string) {
+  return [
+    { key: "ddex",     label: FORMAT_STEP_LABEL[fmt] ?? "Format Validation", duration: 800 },
+    { key: "metadata", label: "DSP Metadata Rules",                           duration: 900 },
+    { key: "fraud",    label: "Fraud Pre-Screening",                          duration: 1100 },
+    { key: "audio",    label: "Audio QA",                                     duration: 1300 },
+    { key: "artwork",  label: "Metadata Enrichment",                          duration: 700 },
+  ];
+}
+
+function getLayerLabels(fmt: string): Record<string, string> {
+  return {
+    ddex:     FORMAT_LAYER_LABEL[fmt] ?? "Format Validation",
+    metadata: "DSP Metadata Rules",
+    fraud:    "Fraud Screening",
+    audio:    "Audio QA",
+    artwork:  "Artwork Validation",
+  };
+}
 
 const SEV_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
 
@@ -303,10 +319,11 @@ function DevtoolsNotice({ visible, onClose }: { visible: boolean; onClose: () =>
 
 // ── Progress animation ────────────────────────────────────────────────────────
 
-function ScanProgress({ completedLayers }: { completedLayers: Set<string> }) {
+function ScanProgress({ completedLayers, fmt }: { completedLayers: Set<string>; fmt: string }) {
+  const steps = getLayerSteps(fmt);
   return (
     <div className="space-y-3">
-      {LAYER_STEPS.map((step, i) => {
+      {steps.map((step, i) => {
         const done    = completedLayers.has(step.key);
         const active  = !done && i === completedLayers.size;
         return (
@@ -375,6 +392,7 @@ export default function DemoPage() {
   const [completedLayers, setCompleted] = useState<Set<string>>(new Set());
   const [scanResult, setScanResult]     = useState<DemoScan | null>(null);
   const [scanError, setScanError]       = useState<string | null>(null);
+  const [scanFormat, setScanFormat]     = useState<string>("xml");
   const [devtoolsNotice, setDevtoolsNotice] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; content: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -403,10 +421,11 @@ export default function DemoPage() {
 
   // ── Animate progress layers ───────────────────────────────────────────────
 
-  async function animateLayers(scanPromise: Promise<DemoScan>) {
+  async function animateLayers(scanPromise: Promise<DemoScan>, fmt: string = "xml") {
     const completed = new Set<string>();
     setCompleted(new Set());
     setScanResult(null);
+    setScanFormat(fmt);
     setPhase("scanning");
 
     let result: DemoScan | null = null;
@@ -415,7 +434,7 @@ export default function DemoPage() {
     // Start the real scan in parallel with the animation
     scanPromise.then(r => { result = r; }).catch(e => { fetchError = e.message; });
 
-    for (const step of LAYER_STEPS) {
+    for (const step of getLayerSteps(fmt)) {
       await new Promise(r => setTimeout(r, step.duration));
       completed.add(step.key);
       setCompleted(new Set(completed));
@@ -457,7 +476,7 @@ export default function DemoPage() {
         if (!res.ok) throw new Error("Scan failed. Please try again.");
         return res.json() as Promise<DemoScan>;
       });
-    await animateLayers(promise);
+    await animateLayers(promise, "xml");
   }
 
   // ── Scan with uploaded file ───────────────────────────────────────────────
@@ -466,6 +485,10 @@ export default function DemoPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setScanError(null);
+
+    // Detect format from filename for the loading animation
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "xml";
+    const fmt = ext === "csv" ? "csv" : ext === "json" ? "json" : "xml";
 
     // Read and store file content for download later
     const text = await file.text();
@@ -485,7 +508,7 @@ export default function DemoPage() {
         return res.json() as Promise<DemoScan>;
       });
 
-    await animateLayers(promise);
+    await animateLayers(promise, fmt);
     // Reset file input
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -565,6 +588,7 @@ export default function DemoPage() {
   }
 
   const layers = ["ddex", "metadata", "fraud", "audio", "artwork"];
+  const layerLabels = getLayerLabels(scanResult?.file_format ?? scanFormat);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -650,7 +674,7 @@ export default function DemoPage() {
               <p className="mb-6 text-sm font-semibold text-slate-700">
                 Running your release through 5 QA layers…
               </p>
-              <ScanProgress completedLayers={completedLayers} />
+              <ScanProgress completedLayers={completedLayers} fmt={scanFormat} />
               <p className="mt-4 text-xs text-slate-400">
                 Estimated time: ~45 seconds
               </p>
@@ -754,7 +778,7 @@ export default function DemoPage() {
                     {layers.map(layer => (
                       <LayerMiniBar
                         key={layer}
-                        label={LAYER_LABELS[layer] ?? layer}
+                        label={layerLabels[layer] ?? layer}
                         score={layerScore(scanResult.results, layer)}
                       />
                     ))}
@@ -772,7 +796,7 @@ export default function DemoPage() {
                 <div key={layer} className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                      {LAYER_LABELS[layer] ?? layer}
+                      {layerLabels[layer] ?? layer}
                       {critical > 0 && (
                         <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
                           {critical} critical
