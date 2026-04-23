@@ -25,7 +25,7 @@ interface DemoResult {
   id: string;
   layer: string;
   rule_name: string;
-  severity: "critical" | "warning" | "info";
+  severity: "critical" | "error" | "warning" | "info";
   message: string;
   field_path: string | null;
   actual_value: string | null;
@@ -84,7 +84,7 @@ function getLayerLabels(fmt: string): Record<string, string> {
   };
 }
 
-const SEV_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+const SEV_ORDER: Record<string, number> = { critical: 0, error: 0, warning: 1, info: 2 };
 
 // ── Right-click / devtools protection ─────────────────────────────────────────
 
@@ -186,7 +186,7 @@ function IssueCard({ result }: { result: DemoResult }) {
       <div className="flex cursor-pointer items-start gap-3 p-4"
         onClick={() => setExpanded(e => !e)}>
         <div className="mt-0.5 shrink-0">
-          {result.severity === "critical"
+          {(result.severity === "critical" || result.severity === "error")
             ? <AlertTriangle className="h-4 w-4 text-red-500" />
             : result.severity === "warning"
             ? <AlertTriangle className="h-4 w-4 text-amber-500" />
@@ -243,6 +243,7 @@ function IssueCard({ result }: { result: DemoResult }) {
 function SeverityBadge({ severity }: { severity: string }) {
   const cls: Record<string, string> = {
     critical: "bg-red-100 text-red-700",
+    error:    "bg-red-100 text-red-700",
     warning:  "bg-amber-100 text-amber-700",
     info:     "bg-blue-50 text-blue-700",
   };
@@ -359,7 +360,8 @@ function ScanProgress({ completedLayers, fmt }: { completedLayers: Set<string>; 
 
 function layerScore(results: DemoResult[], layer: string): number {
   const layerResults = results.filter(r => r.layer === layer);
-  const criticals    = layerResults.filter(r => r.severity === "critical").length;
+  // "error" (DDEX layer) and "critical" both count at the critical rate
+  const criticals    = layerResults.filter(r => r.severity === "critical" || r.severity === "error").length;
   const warnings     = layerResults.filter(r => r.severity === "warning").length;
   // Mirror backend formula: same deduction weights and caps
   const deductions   = Math.min(criticals * 10, 60) + Math.min(warnings * 3, 25);
@@ -790,7 +792,7 @@ export default function DemoPage() {
             {/* Issues by layer */}
             {layers.filter(l => groupedResults()[l]?.length).map(layer => {
               const results   = groupedResults()[layer] ?? [];
-              const critical  = results.filter(r => r.severity === "critical").length;
+              const critical  = results.filter(r => r.severity === "critical" || r.severity === "error").length;
               const warnings  = results.filter(r => r.severity === "warning").length;
               return (
                 <div key={layer} className="space-y-3">

@@ -37,10 +37,10 @@ const LAYER_LABELS: Record<string, string> = {
 
 const LAYER_ORDER = ["ddex", "metadata", "fraud", "artwork", "enrichment"];
 
-const SEV_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+const SEV_ORDER: Record<string, number> = { critical: 0, error: 0, warning: 1, info: 2 };
 
 function severityIcon(severity: string) {
-  if (severity === "critical")
+  if (severity === "critical" || severity === "error")
     return <AlertTriangle className="h-4 w-4 text-red-500" />;
   if (severity === "warning")
     return <AlertTriangle className="h-4 w-4 text-amber-500" />;
@@ -50,6 +50,7 @@ function severityIcon(severity: string) {
 function SeverityBadge({ severity }: { severity: string }) {
   const cls: Record<string, string> = {
     critical: "bg-red-100 text-red-700",
+    error:    "bg-red-100 text-red-700",
     warning: "bg-amber-100 text-amber-700",
     info: "bg-blue-50 text-blue-700",
   };
@@ -399,7 +400,7 @@ export default function ScanResultsPage() {
   // Per-layer scores for mini bars (simple: 100 minus proportional deductions)
   function layerScore(layer: string): number {
     const layerResults = resultsByLayer[layer] ?? [];
-    const criticals = layerResults.filter((r) => !r.resolved && r.severity === "critical").length;
+    const criticals = layerResults.filter((r) => !r.resolved && (r.severity === "critical" || r.severity === "error")).length;
     const warnings = layerResults.filter((r) => !r.resolved && r.severity === "warning").length;
     return Math.max(0, 100 - criticals * 20 - warnings * 7);
   }
@@ -548,7 +549,7 @@ export default function ScanResultsPage() {
         <div className="space-y-6">
           {nonEnrichmentLayers.map((layer) => {
             const results = resultsByLayer[layer];
-            const critical = results.filter((r) => r.severity === "critical" && !r.resolved).length;
+            const critical = results.filter((r) => (r.severity === "critical" || r.severity === "error") && !r.resolved).length;
             const warnings = results.filter((r) => r.severity === "warning" && !r.resolved).length;
 
             return (

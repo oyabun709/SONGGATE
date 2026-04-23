@@ -382,8 +382,8 @@ def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
             dur_s = dur_ms // 1000
             results.append({
                 "id": str(uuid.uuid4()),
-                "layer": "audio",
-                "rule_name": "Audio — Minimum Track Duration",
+                "layer": "metadata",
+                "rule_name": "Metadata — Minimum Track Duration",
                 "severity": "warning",
                 "message": f'"{title}" is {dur_s} seconds — below the 60-second minimum for most DSPs.',
                 "field_path": "SoundRecording/Duration",
@@ -492,7 +492,7 @@ def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
         "warning_count": warnings,
         "info_count": info,
         "total_issues": critical + warnings + info,
-        "layers_run": ["ddex", "metadata", "fraud", "artwork", "audio"],
+        "layers_run": ["ddex", "metadata", "fraud", "artwork"],
         "results": results,
         "release_title": parsed_meta.get("title", "Uploaded Release"),
         "release_artist": parsed_meta.get("artist", ""),
