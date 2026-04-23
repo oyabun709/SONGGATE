@@ -15,7 +15,6 @@ import {
   ChevronDown,
   ChevronUp,
   Lock,
-  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -732,18 +731,10 @@ export default function DemoPage() {
                   Start free trial <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
-                  href="https://cal.com/songgate"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="mailto:andrew@housesonhills.io?subject=SONGGATE Pilot&body=Hi, I'd like to book a call to discuss a SONGGATE pilot."
                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  Book a pilot call <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-                <a
-                  href="mailto:andrew@housesonhills.io"
-                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  Talk to our team
+                  Book a pilot call
                 </a>
               </div>
               <p className="mt-5 text-xs text-slate-400">
