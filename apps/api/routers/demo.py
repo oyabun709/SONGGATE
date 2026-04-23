@@ -429,8 +429,6 @@ async def demo_scan(
     a DDEX XML document.  Omit the field to use the embedded sample release.
     """
     ip = _client_ip(request)
-    _check_rate_limit(ip)
-
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:8]
 
     if file is not None:
