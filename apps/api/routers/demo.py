@@ -29,7 +29,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.responses import JSONResponse
 
-from config.file_types import detect_format
+from file_types import detect_format
 from services.ddex.validator import DDEXValidator, DDEXParser
 from services.ddex.csv_parser import CSVParser
 from services.ddex.json_parser import JSONParser

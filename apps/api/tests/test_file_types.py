@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import pytest
 
-from config.file_types import (
+from file_types import (
     ALL_FORMATS,
     DEMO_ACCEPTED_EXTENSIONS,
     FORMAT_DISPLAY_STRING,
