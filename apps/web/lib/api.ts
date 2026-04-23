@@ -24,7 +24,7 @@ api.interceptors.response.use(
 export type ScanStatus = "queued" | "running" | "complete" | "failed";
 export type ScanGrade = "PASS" | "WARN" | "FAIL";
 export type ResultStatus = "fail" | "warn" | "pass";
-export type Severity = "critical" | "warning" | "info";
+export type Severity = "critical" | "error" | "warning" | "info";
 export type Layer = "ddex" | "metadata" | "fraud" | "audio" | "artwork" | "enrichment";
 
 export interface Scan {
