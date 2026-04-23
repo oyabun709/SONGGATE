@@ -240,6 +240,7 @@ class ScanOrchestrator:
                 scan.critical_count = score_data["critical_count"]
                 scan.warning_count = score_data["warning_count"]
                 scan.info_count = score_data["info_count"]
+                scan.validated_fields = self._build_validated_fields(release)
                 scan.status = ScanStatus.complete
                 scan.completed_at = datetime.now(timezone.utc)
 
@@ -748,6 +749,55 @@ class ScanOrchestrator:
             select(Scan).where(Scan.id == uuid.UUID(scan_id))
         )
         return result.scalar_one_or_none()
+
+    def _build_validated_fields(self, release: Release) -> list[dict]:
+        """
+        Build the validated_fields list that mirrors the demo's green checks view.
+        Returns a list of {label, value, format} dicts for every non-empty field.
+        Stored on the Scan row so the results page can render it without re-parsing.
+        """
+        md = release.metadata_ or {}
+        tracks_data: list[dict] = md.get("tracks", [])
+        isrc_list: list[str] = md.get("isrc_list", [])
+        artwork_w = int(md.get("artwork_width", 0) or 0)
+        artwork_h = int(md.get("artwork_height", 0) or 0)
+
+        def _f(label: str, value, fmt: str = "text"):
+            if value is None or value == "" or value == 0:
+                return None
+            return {"label": label, "value": value, "format": fmt}
+
+        track_lines: list[str] = []
+        for i, t in enumerate(tracks_data, 1):
+            parts = [f"Track {i}"]
+            if t.get("title"):
+                parts.append(t["title"])
+            if t.get("isrc"):
+                parts.append(t["isrc"])
+            track_lines.append(" — ".join(parts))
+
+        release_title = release.title or md.get("title", "")
+
+        raw = [
+            _f("Release Title",    release_title),
+            _f("Artist",           release.artist),
+            _f("Label",            md.get("label")),
+            _f("Release Type",     md.get("release_type")),
+            _f("Genre",            md.get("genre")),
+            _f("Release Date",     str(release.release_date) if release.release_date else None),
+            _f("UPC / Barcode",    release.upc),
+            _f("P-Line",           md.get("p_line")),
+            _f("C-Line",           md.get("c_line")),
+            _f("Parental Warning", md.get("parental_warning")),
+            _f("Territory",        md.get("territory")),
+            _f("Publisher",        md.get("publisher")),
+            _f("Track Count",      len(tracks_data) if tracks_data else None),
+            _f("ISRCs",            ", ".join(isrc_list) if isrc_list else None),
+            _f("Tracks",           track_lines, fmt="list") if track_lines else None,
+            _f("Artwork",
+               f"{artwork_w}×{artwork_h} px" if artwork_w and artwork_h else None),
+        ]
+        return [f for f in raw if f is not None]
 
     def _build_release_metadata(self, release: Release) -> ReleaseMetadata:
         """Construct a ReleaseMetadata from the Release model's stored metadata."""

@@ -409,6 +409,7 @@ async def get_scan_results(
         "warning_count": scan.warning_count,
         "info_count": scan.info_count,
         "layers_run": scan.layers_run,
+        "validated_fields": scan.validated_fields or [],
         "started_at": scan.started_at,
         "completed_at": scan.completed_at,
         "created_at": scan.created_at,

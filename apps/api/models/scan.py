@@ -46,6 +46,7 @@ class Scan(Base):
     warning_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     info_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     layers_run: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    validated_fields: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     report_url: Mapped[str | None] = mapped_column(String, nullable=True)
     report_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

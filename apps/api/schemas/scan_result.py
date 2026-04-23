@@ -32,6 +32,7 @@ class ScanResultRead(BaseModel):
 class ScanDetailRead(ScanRead):
     """Scan with its full result corpus."""
     results: list[ScanResultRead] = []
+    validated_fields: list[dict] = []
 
 
 class ResolveRequest(BaseModel):
