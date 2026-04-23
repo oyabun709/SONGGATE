@@ -4,7 +4,7 @@ from fastapi.openapi.utils import get_openapi
 
 from config import settings
 from routers import releases, pipelines, rules, reports, health, webhooks, uploads, scans
-from routers import public_api, billing, admin
+from routers import public_api, billing, admin, demo
 
 app = FastAPI(
     title="RopQA API",
@@ -55,9 +55,10 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
-# ── Health / webhooks (no auth) ───────────────────────────────────────────────
+# ── Health / webhooks / demo (no auth) ───────────────────────────────────────
 app.include_router(health.router, tags=["health"])
 app.include_router(webhooks.router, prefix="/webhooks", tags=["webhooks"])
+app.include_router(demo.router, tags=["demo"])
 
 # ── Internal routes (Clerk JWT) ───────────────────────────────────────────────
 app.include_router(releases.router, prefix="/releases", tags=["releases"])

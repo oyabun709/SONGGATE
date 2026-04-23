@@ -119,10 +119,10 @@ export default function LandingPage() {
             {copied === "hero" ? "Email copied!" : <>Book a demo <ArrowRight className="h-4 w-4" /></>}
           </button>
           <Link
-            href="/onboarding"
+            href="/demo"
             className="flex items-center gap-2 rounded-lg border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
-            See a live demo
+            See live demo <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
         <p className="mt-4 text-sm text-slate-400">
@@ -245,12 +245,20 @@ export default function LandingPage() {
           and put together a plan that fits your team. Your first 5 scans are
           free — no commitment required.
         </p>
-        <button
-          onClick={() => copyEmail("schedule")}
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-        >
-          {copied === "schedule" ? "Email copied!" : <>Schedule a call <ArrowRight className="h-4 w-4" /></>}
-        </button>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Link
+            href="/demo"
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+          >
+            Try the live demo <ArrowRight className="h-4 w-4" />
+          </Link>
+          <button
+            onClick={() => copyEmail("schedule")}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-8 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            {copied === "schedule" ? "Email copied!" : <>Schedule a call <ArrowRight className="h-4 w-4" /></>}
+          </button>
+        </div>
         <p className="mt-5 text-sm text-slate-400">
           Reach us directly at{" "}
           <a href="mailto:andrew@housesonhills.io" className="underline hover:text-slate-600">
