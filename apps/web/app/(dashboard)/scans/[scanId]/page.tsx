@@ -22,6 +22,7 @@ import {
   resolveResult,
   type ScanDetail,
   type ScanResult,
+  type ValidatedField,
 } from "@/lib/api";
 import { ScoreCircle } from "@/components/scan/ScoreCircle";
 
@@ -589,14 +590,53 @@ export default function ScanResultsPage() {
         </div>
       )}
 
-      {/* No issues */}
+      {/* No issues — green checks view */}
       {scan.status === "complete" && scan.total_issues === 0 && enrichmentResults.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 py-12 text-center">
-          <CheckCircle2 className="mb-3 h-10 w-10 text-emerald-500" />
-          <h2 className="text-base font-semibold text-emerald-800">All checks passed</h2>
-          <p className="mt-1 text-sm text-emerald-600">
-            No issues found across all QA layers. This release is ready for delivery.
-          </p>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-6 py-5 border-b border-emerald-200">
+            <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0" />
+            <div>
+              <h2 className="text-base font-semibold text-emerald-800">All checks passed</h2>
+              <p className="text-xs text-emerald-600 mt-0.5">
+                Every validation rule passed. This release is ready for delivery.
+              </p>
+            </div>
+            <span className="ml-auto rounded-full bg-emerald-100 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700 tracking-wider">
+              100 / PASS
+            </span>
+          </div>
+
+          {/* Validated fields grid */}
+          {scan.validated_fields && scan.validated_fields.length > 0 && (
+            <div className="px-6 py-5">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-emerald-700">
+                Validated fields
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {scan.validated_fields.map((field: ValidatedField) => (
+                  <div key={field.label}
+                    className="flex items-start gap-2.5 rounded-lg border border-emerald-100 bg-white px-4 py-3">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-slate-500">{field.label}</p>
+                      {field.format === "list" && Array.isArray(field.value) ? (
+                        <ul className="mt-0.5 space-y-0.5">
+                          {(field.value as string[]).map((item: string, i: number) => (
+                            <li key={i} className="text-sm text-slate-800 truncate">{item}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-0.5 text-sm font-medium text-slate-800 truncate">
+                          {String(field.value)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

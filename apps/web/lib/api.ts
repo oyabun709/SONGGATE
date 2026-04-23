@@ -65,8 +65,15 @@ export interface ScanResult {
   created_at: string;
 }
 
+export interface ValidatedField {
+  label: string;
+  value: string | number | string[];
+  format: "text" | "list";
+}
+
 export interface ScanDetail extends Scan {
   results: ScanResult[];
+  validated_fields?: ValidatedField[];
 }
 
 export interface Release {
