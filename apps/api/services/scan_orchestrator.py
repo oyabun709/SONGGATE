@@ -58,6 +58,61 @@ _ALL_LAYERS = ["ddex", "metadata", "fraud", "audio", "artwork", "enrichment"]
 # Score calculation
 # ──────────────────────────────────────────────────────────────────────────────
 
+def deduplicate_cross_layer(results: list[ScanResult]) -> list[ScanResult]:
+    """
+    Remove ScanResult rows that duplicate what a more specific layer already caught.
+    Mirrors the same logic in the demo endpoint.
+
+    Rules:
+      1. Artwork layer has a finding → drop metadata artwork-dimension rules
+      2. DDEX has an ISRC format error → drop metadata generic ISRC-format rule
+      3. DDEX has a missing-publisher finding → drop metadata publisher-required rule
+      4. Metadata warned about a short track by name → drop fraud short-track signal
+    """
+    has_artwork = any(r.layer == "artwork" for r in results)
+    ddex_isrc_error = any(
+        r.layer == "ddex" and "isrc" in (r.message or "").lower() for r in results
+    )
+    ddex_publisher_error = any(
+        r.layer == "ddex" and "publisher" in (r.message or "").lower() for r in results
+    )
+    meta_short_titles: set[str] = set()
+    for r in results:
+        if r.layer == "metadata" and " seconds" in (r.message or ""):
+            msg = r.message or ""
+            if msg.startswith('"'):
+                try:
+                    meta_short_titles.add(msg[1: msg.index('"', 1)].lower())
+                except ValueError:
+                    pass
+
+    deduped: list[ScanResult] = []
+    for r in results:
+        msg = (r.message or "").lower()
+        rule = (r.rule_id or "").lower()
+
+        if has_artwork and r.layer == "metadata":
+            if "artwork" in msg or "artwork" in rule:
+                continue
+
+        if ddex_isrc_error and r.layer == "metadata":
+            if "iso 3901" in msg or "isrc must follow" in msg:
+                continue
+
+        if ddex_publisher_error and r.layer == "metadata":
+            if "publisher" in msg and ("required" in msg or "rights holder" in msg):
+                continue
+
+        if meta_short_titles and r.layer == "fraud":
+            if "under 60 seconds" in msg or "sub-60" in msg:
+                if any(t in msg for t in meta_short_titles):
+                    continue
+
+        deduped.append(r)
+
+    return deduped
+
+
 def calculate_readiness_score(results: list[ScanResult]) -> dict[str, Any]:
     """
     Aggregate ScanResult rows into a readiness score and grade.
@@ -229,6 +284,9 @@ class ScanOrchestrator:
                 for sr in all_results:
                     db.add(sr)
                 await db.flush()
+
+                # ── Deduplicate cross-layer findings before scoring ────────
+                all_results = deduplicate_cross_layer(all_results)
 
                 # ── Calculate score from sync-layer results only ───────────
                 # (audio results arrive later and update the scan via the task)

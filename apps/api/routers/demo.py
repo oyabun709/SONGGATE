@@ -241,6 +241,78 @@ def _sanitise_rule_id(rule_id: str) -> str:
     return " — ".join(p.title() for p in parts)
 
 
+def _deduplicate_cross_layer(results: list[dict]) -> list[dict]:
+    """
+    Remove findings that duplicate what a more specific layer already caught.
+    Prevents the same root problem appearing 2–3× from different layers.
+
+    Rules (applied in order):
+      1. Artwork layer has a finding → drop metadata artwork-dimension rules
+         (artwork layer is more precise; metadata rules fire once per DSP)
+      2. DDEX layer has an ISRC format error → drop the generic metadata
+         "ISRC must follow ISO 3901" rule (same issue, less specific)
+      3. DDEX layer has a missing-publisher finding → drop the metadata
+         "Publisher is required" rule (per-track check is more useful)
+      4. Metadata layer already warned about a short track by name →
+         drop the fraud short-track spam signal for that same track
+    """
+    has_artwork_finding = any(r["layer"] == "artwork" for r in results)
+
+    ddex_has_isrc_error = any(
+        r["layer"] == "ddex" and "isrc" in r.get("message", "").lower()
+        for r in results
+    )
+
+    ddex_has_publisher_error = any(
+        r["layer"] == "ddex" and "publisher" in r.get("message", "").lower()
+        for r in results
+    )
+
+    # Collect track titles already warned on in metadata duration checks
+    meta_short_titles: set[str] = set()
+    for r in results:
+        if r["layer"] == "metadata" and " seconds" in r.get("message", ""):
+            msg = r["message"]
+            if msg.startswith('"'):
+                try:
+                    meta_short_titles.add(msg[1: msg.index('"', 1)].lower())
+                except ValueError:
+                    pass
+
+    deduped: list[dict] = []
+    for r in results:
+        msg = r.get("message", "")
+        layer = r.get("layer", "")
+        msg_lower = msg.lower()
+
+        # 1. Artwork layer present → drop metadata artwork dimension rules
+        if has_artwork_finding and layer == "metadata":
+            if "artwork" in msg_lower or "artwork" in r.get("rule_name", "").lower():
+                continue
+
+        # 2. DDEX caught ISRC format → drop metadata generic ISRC format rule
+        if ddex_has_isrc_error and layer == "metadata":
+            if "iso 3901" in msg_lower or "isrc must follow" in msg_lower:
+                continue
+
+        # 3. DDEX caught missing publisher → drop metadata publisher-required rule
+        if ddex_has_publisher_error and layer == "metadata":
+            if "publisher" in msg_lower and (
+                "required" in msg_lower or "rights holder" in msg_lower
+            ):
+                continue
+
+        # 4. Metadata warned on short track → drop fraud spam signal for same track
+        if meta_short_titles and layer == "fraud":
+            if "under 60 seconds" in msg_lower or "sub-60" in msg_lower:
+                if any(t in msg_lower for t in meta_short_titles):
+                    continue
+
+        deduped.append(r)
+
+    return deduped
+
+
 def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
     """
     Run all applicable QA layers on raw metadata bytes (XML, CSV, or JSON).
@@ -469,6 +541,9 @@ def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
             })
     except Exception as exc:
         logger.warning("Demo fraud layer error: %s", exc)
+
+    # ── Deduplicate cross-layer findings before scoring ────────────────────────
+    results = _deduplicate_cross_layer(results)
 
     # ── Score ──────────────────────────────────────────────────────────────────
     # "error" (DDEX layer) and "critical" (metadata/fraud layers) both deduct at the critical rate

@@ -141,6 +141,7 @@ class DDEXValidator:
         findings.extend(_check_isrc_format(root, norm_version))
         findings.extend(_check_upc_format(root, norm_version))
         findings.extend(_check_message_header(root, norm_version))
+        findings.extend(_check_publisher_per_track(root, norm_version))
 
         # Step 3 — remote schema/Schematron (optional)
         if self._api_key:
@@ -493,6 +494,63 @@ def _check_message_header(root: etree._Element, norm_version: str) -> list[DDEXF
                     fix_hint=f"Add <{field_name}> inside <MessageHeader>.",
                 )
             )
+    return findings
+
+
+def _check_publisher_per_track(root: etree._Element, norm_version: str) -> list[DDEXFinding]:
+    """
+    Check that every SoundRecording has a MusicPublisher contributor or DisplayPublisher.
+    A missing publisher on even one track is a DSP rejection risk.
+    """
+    findings: list[DDEXFinding] = []
+    ns = _detect_namespace(root)
+    prefix = f"{{{ns}}}" if ns else ""
+
+    # Collect all SoundRecording elements (deduplicated by identity)
+    seen: set[int] = set()
+    recordings: list[etree._Element] = []
+    for sr in list(root.iter(f"{prefix}SoundRecording")) + (list(root.iter("SoundRecording")) if prefix else []):
+        if id(sr) not in seen:
+            seen.add(id(sr))
+            recordings.append(sr)
+
+    for i, sr in enumerate(recordings, 1):
+        # Track title for a helpful message
+        title_el = sr.find(f".//{prefix}TitleText") or sr.find(".//TitleText")
+        title = (title_el.text or "").strip() if title_el is not None else f"Track {i}"
+
+        # ISRC for context
+        isrc_el = (sr.find(f"{prefix}IsRC") or sr.find(f"{prefix}ISRC") or
+                   sr.find("IsRC") or sr.find("ISRC"))
+        isrc = (isrc_el.text or "").strip() if isrc_el is not None else ""
+
+        # Check for DisplayPublisher
+        has_publisher = bool(
+            sr.find(f".//{prefix}DisplayPublisher") or sr.find(".//DisplayPublisher")
+        )
+
+        # Check for Contributor with Role=MusicPublisher
+        if not has_publisher:
+            for contrib in list(sr.iter(f"{prefix}Contributor")) + (list(sr.iter("Contributor")) if prefix else []):
+                role_el = contrib.find(f"{prefix}Role") or contrib.find("Role")
+                if role_el is not None and (role_el.text or "").strip() == "MusicPublisher":
+                    has_publisher = True
+                    break
+
+        if not has_publisher:
+            isrc_ref = f" (ISRC: {isrc})" if isrc else ""
+            findings.append(DDEXFinding(
+                rule_id="ddex.metadata.missing_publisher",
+                severity="error",
+                message=f"Track {i} \"{title}\"{isrc_ref} is missing a MusicPublisher contributor.",
+                field_path=f"ResourceList/SoundRecording[{i}]",
+                actual_value=None,
+                fix_hint=(
+                    "Add <Contributor><PartyName><FullName>Publisher Name</FullName></PartyName>"
+                    "<Role>MusicPublisher</Role></Contributor> to this SoundRecording."
+                ),
+            ))
+
     return findings
 
 
