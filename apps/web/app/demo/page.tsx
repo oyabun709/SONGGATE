@@ -278,7 +278,7 @@ function TermsModal({ onAccept }: { onAccept: () => void }) {
         </p>
 
         <p className="mb-6 text-xs text-slate-400">
-          © 2026 HOUSE LABS / HOUSESONHILLS. All rights reserved.
+          © 2026 HOUSELABS / HOUSESONHILLS. All rights reserved.
         </p>
 
         <button
@@ -682,7 +682,7 @@ export default function DemoPage() {
           {phase === "scanning" && (
             <div className="mt-12 mx-auto max-w-sm">
               <p className="mb-6 text-sm font-semibold text-slate-700">
-                Running your release through 5 QA layers…
+                Running your release through 4 QA layers…
               </p>
               <ScanProgress completedLayers={completedLayers} fmt={scanFormat} />
               <p className="mt-4 text-xs text-slate-400">
