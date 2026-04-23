@@ -471,7 +471,8 @@ def _run_in_memory_scan(content: bytes, filename: str = "") -> dict[str, Any]:
         logger.warning("Demo fraud layer error: %s", exc)
 
     # ── Score ──────────────────────────────────────────────────────────────────
-    critical = sum(1 for r in results if r["severity"] == "critical")
+    # "error" (DDEX layer) and "critical" (metadata/fraud layers) both deduct at the critical rate
+    critical = sum(1 for r in results if r["severity"] in ("critical", "error"))
     warnings = sum(1 for r in results if r["severity"] == "warning")
     info     = sum(1 for r in results if r["severity"] == "info")
 
