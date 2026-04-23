@@ -16,6 +16,10 @@ const isPublicRoute = createRouteMatcher([
 const isOrgSelectionRoute = createRouteMatcher(["/org-selection(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
+  // Explicit pathname guard — covers cases where createRouteMatcher
+  // doesn't match the base path without a trailing slash in Clerk v6
+  if (req.nextUrl.pathname.startsWith("/demo")) return NextResponse.next();
+
   if (isPublicRoute(req)) return NextResponse.next();
 
   const { userId, orgId } = await auth();
