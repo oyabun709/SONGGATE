@@ -423,9 +423,9 @@ def _check_isrc_format(root: etree._Element, norm_version: str) -> list[DDEXFind
     ns = _detect_namespace(root)
     prefix = f"{{{ns}}}" if ns else ""
 
-    isrc_elements = list(root.iter(f"{prefix}ISRC"))
+    isrc_elements = list(root.iter(f"{prefix}ISRC")) + list(root.iter(f"{prefix}IsRC"))
     if not isrc_elements and prefix:
-        isrc_elements = list(root.iter("ISRC"))
+        isrc_elements = list(root.iter("ISRC")) + list(root.iter("IsRC"))
 
     for el in isrc_elements:
         val = (el.text or "").strip()
@@ -557,9 +557,12 @@ def _extract_release_fields(release: etree._Element, prefix: str) -> dict[str, A
         grid = rid.findtext(f"{prefix}GRid") or rid.findtext("GRid")
         if grid:
             data["grid"] = grid.strip()
-        icpn = rid.findtext(f"{prefix}ICPN") or rid.findtext("ICPN")
-        if icpn:
-            data["upc"] = icpn.strip()
+        upc = (rid.findtext(f"{prefix}ICPN/{prefix}UPC") or
+               rid.findtext("ICPN/UPC") or
+               rid.findtext(f"{prefix}ICPN") or
+               rid.findtext("ICPN"))
+        if upc and upc.strip():
+            data["upc"] = upc.strip()
 
     # Title — ReferenceTitle first, then display Title
     for title_path in (
@@ -697,7 +700,9 @@ def _extract_tracks(resource_list: etree._Element, prefix: str) -> list[dict[str
                    f"SoundRecordingId/{prefix}ISRC") or \
                (sr.findtext(f"{prefix}SoundRecordingId/{prefix}ISRC") or "").strip() or None
         # Simpler: just iterate ISRC elements inside this SoundRecording
-        for isrc_el in list(sr.iter(f"{prefix}ISRC")) + list(sr.iter("ISRC")):
+        # Handle both <ISRC> and <IsRC> (case variants in the wild)
+        for isrc_el in (list(sr.iter(f"{prefix}ISRC")) + list(sr.iter(f"{prefix}IsRC")) +
+                        list(sr.iter("ISRC")) + list(sr.iter("IsRC"))):
             v = (isrc_el.text or "").strip()
             if v:
                 isrc = v
@@ -718,12 +723,23 @@ def _extract_tracks(resource_list: etree._Element, prefix: str) -> list[dict[str
             track["duration_ms"] = _iso8601_to_ms(duration)
             track["duration_s"] = round(_iso8601_to_ms(duration) / 1000) if _iso8601_to_ms(duration) else None
 
-        # Publisher — DisplayPublisher/PartyName/FullName
+        # Publisher — check DisplayPublisher or Contributor with Role=MusicPublisher
         publisher_els = list(sr.iter(f"{prefix}DisplayPublisher")) + list(sr.iter("DisplayPublisher"))
         if publisher_els:
             pub_name = _ft(publisher_els[0], prefix, "PartyName/FullName")
             if pub_name:
                 track["publisher"] = pub_name
+        # Also check <Contributor><Role>MusicPublisher</Role> pattern (ERN 4.x)
+        if not publisher_els:
+            for contrib in (list(sr.iter(f"{prefix}Contributor")) + list(sr.iter("Contributor"))):
+                role = (contrib.findtext(f"{prefix}Role") or contrib.findtext("Role") or "").strip()
+                if role == "MusicPublisher":
+                    pub_name = (contrib.findtext(f"{prefix}PartyName/{prefix}FullName") or
+                                contrib.findtext("PartyName/FullName") or "").strip()
+                    if pub_name:
+                        track["publisher"] = pub_name
+                    publisher_els = [contrib]
+                    break
         track["has_publisher"] = bool(publisher_els)
 
         # Artist
