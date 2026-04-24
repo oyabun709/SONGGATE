@@ -30,7 +30,6 @@ const SLIDES = [
   "The Moat",
   "Business Model",
   "Who Buys This",
-  "Acquisition Landscape",
   "The Ask",
 ];
 
@@ -195,7 +194,7 @@ function Slide03Gap() {
         </table>
       </div>
       <p className="text-center text-xs text-slate-600">
-        Distributor validation = submission gate tied to their pipeline. SONGGATE = standalone, runs anywhere.
+        Unlike distributor validators, SONGGATE runs before submission — independent of any delivery pipeline.
       </p>
     </div>
   );
@@ -443,13 +442,6 @@ function Slide08WhoButsThis() {
       why: "DDEX-heavy workflows, ISRC and ISWC validation, publishing metadata at scale. Existing tools don't score DSP readiness.",
       urgency: "Medium",
     },
-    {
-      emoji: "🎯",
-      type: "Strategic Acquirers",
-      example: "UMG, WMG, Believe, AudioSalad",
-      why: "Buy the data corpus, rules library, and customer relationships. Faster than building. Bolt onto existing distribution stack.",
-      urgency: "Long-term",
-    },
   ];
 
   return (
@@ -471,83 +463,6 @@ function Slide08WhoButsThis() {
             </div>
             <div className="text-xs text-slate-500">{example}</div>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">{why}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Slide09Acquisition() {
-  const deals = [
-    {
-      acquirer: "Universal Music Group",
-      target: "Downtown Music (FUGA + CD Baby)",
-      value: "$775M",
-      year: "2023",
-      why: "Distribution scale + catalog data. FUGA's B2B distribution tech was the crown jewel.",
-      relevance: "Precedent for music-tech infrastructure acquisitions at scale",
-    },
-    {
-      acquirer: "Warner Music Group",
-      target: "Revelator",
-      value: "Undisclosed",
-      year: "2022",
-      why: "Music analytics and royalty data platform. Data moat acquisition.",
-      relevance: "Validates buying data/analytics layers vs. building them",
-    },
-    {
-      acquirer: "Luminate (Billboard)",
-      target: "Quansic",
-      value: "Undisclosed",
-      year: "2023",
-      why: "Music entity resolution and metadata infrastructure.",
-      relevance: "Metadata tooling is acquisition-worthy on its own",
-    },
-    {
-      acquirer: "Strategic buyer",
-      target: "SONGGATE",
-      value: "$2M – $7M",
-      year: "Target",
-      why: "DSP rules corpus + incident dataset + API pipeline embedding. Bolt-on for any distributor or rights platform.",
-      relevance: "2–3x ARR at scale, or strategic premium for data + defensibility",
-      highlight: true,
-    },
-  ];
-
-  return (
-    <div className="flex flex-col h-full justify-center gap-4 sm:gap-6">
-      <div>
-        <h2 className="text-2xl sm:text-4xl font-bold text-center">Acquisition Landscape</h2>
-        <p className="text-center text-slate-400 text-sm sm:text-base mt-1">Music infrastructure M&A is active. Data moats get acquired.</p>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-4xl mx-auto w-full">
-        {deals.map(({ acquirer, target, value, year, why, relevance, highlight }) => (
-          <div
-            key={target}
-            className="rounded-xl border p-4 sm:p-5 flex flex-col gap-2"
-            style={{
-              borderColor: highlight ? ACCENT : "rgb(30,32,44)",
-              background: highlight ? `${ACCENT}11` : "rgba(255,255,255,0.02)",
-            }}
-          >
-            {highlight && (
-              <div className="text-xs font-semibold rounded-full px-2 py-0.5 w-fit" style={{ background: ACCENT, color: "white" }}>
-                SONGGATE target
-              </div>
-            )}
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="text-xs text-slate-500">{acquirer} acquired</div>
-                <div className="font-semibold text-white text-sm mt-0.5">{target}</div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="font-black text-base sm:text-lg" style={{ color: highlight ? ACCENT : "white" }}>{value}</div>
-                <div className="text-xs text-slate-500">{year}</div>
-              </div>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">{why}</p>
-            <div className="rounded bg-white/[0.04] px-2 py-1.5 text-xs text-slate-500">{relevance}</div>
           </div>
         ))}
       </div>
@@ -640,7 +555,6 @@ const SLIDE_COMPONENTS = [
   Slide06Moat,
   Slide07BusinessModel,
   Slide08WhoButsThis,
-  Slide09Acquisition,
   Slide10Ask,
 ];
 
