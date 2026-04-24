@@ -207,6 +207,8 @@ _MINIMAL_DEMO_XML = """\
         <Genre><GenreText>Indie Electronic</GenreText></Genre>
         <ParentalWarningType>NotExplicit</ParentalWarningType>
         <ReleaseDate>2026-06-01</ReleaseDate>
+        <PLine><Year>2026</Year><PLineText>(P) 2026 Nova Crest Records</PLineText></PLine>
+        <CLine><Year>2026</Year><CLineText>(C) 2026 Nova Crest Records</CLineText></CLine>
       </ReleaseDetailsByTerritory>
     </Release>
   </ReleaseList>
@@ -767,8 +769,8 @@ async def get_sample_xml(request: Request) -> JSONResponse:
         "tracks": 3,
         "intentional_errors": 4,
         "description": (
-            "A 3-track album with 4 intentional errors: "
-            "missing publisher on Track 2, malformed ISRC on Track 3, "
-            "artwork below 3000×3000 minimum, and a 45-second spam-signal track."
+            "A 3-track album with 4 intentional issues: "
+            "malformed ISRC on Track 3, missing publisher on Track 2, "
+            "artwork below 3000×3000 minimum, and a 45-second short-track flag."
         ),
     })
