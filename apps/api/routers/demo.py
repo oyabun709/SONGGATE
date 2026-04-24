@@ -26,10 +26,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Body, HTTPException, Request, UploadFile, File
+from fastapi.responses import JSONResponse, Response
 
 from file_types import detect_format
+from services.reports.generator import ReportData, ReportIssue, ReportGenerator
 from services.ddex.validator import DDEXValidator, DDEXParser
 from services.ddex.csv_parser import CSVParser
 from services.ddex.json_parser import JSONParser
@@ -43,7 +44,7 @@ router = APIRouter(prefix="/api/demo", tags=["demo"])
 # ── Rate limiting ─────────────────────────────────────────────────────────────
 
 _RATE_WINDOW = 3600          # 1 hour in seconds
-_RATE_LIMIT   = 10           # max scans per IP per window
+_RATE_LIMIT   = 25           # max scans per IP per window
 
 # { ip_hash: [(timestamp, ...), ...] }
 _rate_buckets: dict[str, list[float]] = defaultdict(list)
@@ -659,6 +660,99 @@ async def demo_scan(
     )
 
     return JSONResponse(content=result)
+
+
+@router.post("/pdf")
+async def demo_pdf(body: dict = Body(...)) -> Response:
+    """
+    Generate a PDF report from a demo scan result.
+
+    Accepts the full JSON body returned by POST /api/demo/scan.
+    Returns a PDF file with Content-Disposition: attachment.
+    """
+    try:
+        results: list[dict] = body.get("results", [])
+        release_title  = body.get("release_title", "Demo Release") or "Demo Release"
+        release_artist = body.get("release_artist", "") or ""
+        score          = float(body.get("readiness_score", 0))
+        grade          = body.get("grade", "FAIL")
+        critical_count = int(body.get("critical_count", 0))
+        warning_count  = int(body.get("warning_count", 0))
+        info_count     = int(body.get("info_count", 0))
+
+        # Per-layer scores
+        layers = ["ddex", "metadata", "fraud", "artwork"]
+        layer_scores: dict[str, float] = {}
+        for layer in layers:
+            lr = [r for r in results if r.get("layer") == layer]
+            crits = sum(1 for r in lr if r.get("severity") in ("critical", "error"))
+            warns = sum(1 for r in lr if r.get("severity") == "warning")
+            layer_scores[layer] = max(0.0, 100.0 - min(crits * 10.0, 60.0) - min(warns * 3.0, 25.0))
+
+        # DSP readiness — derive from which DSPs have critical-level findings
+        all_dsps: set[str] = set()
+        for r in results:
+            all_dsps.update(r.get("dsp_targets") or [])
+        if not all_dsps:
+            all_dsps = {"spotify", "apple_music", "amazon", "tidal", "deezer"}
+        dsp_readiness: dict[str, str] = {}
+        for dsp in all_dsps:
+            has_issue = any(
+                dsp in (r.get("dsp_targets") or [])
+                and r.get("severity") in ("critical", "error")
+                for r in results
+            )
+            dsp_readiness[dsp] = "issues" if has_issue else "ready"
+
+        # Map findings to ReportIssue
+        issues = [
+            ReportIssue(
+                rule_id=r.get("rule_name", r.get("id", "")),
+                layer=r.get("layer", ""),
+                severity=r.get("severity", "info"),
+                message=r.get("message", ""),
+                fix_hint=r.get("fix_hint"),
+                actual_value=r.get("actual_value"),
+                field_path=r.get("field_path"),
+                dsp_targets=r.get("dsp_targets") or [],
+                resolved=False,
+            )
+            for r in results
+        ]
+
+        data = ReportData(
+            release_title=release_title,
+            release_artist=release_artist,
+            release_upc=None,
+            release_date=None,
+            scan_id=body.get("scan_id", "demo"),
+            scan_date=datetime.now(timezone.utc),
+            org_name="SONGGATE Demo",
+            readiness_score=score,
+            grade=grade,
+            critical_count=critical_count,
+            warning_count=warning_count,
+            info_count=info_count,
+            layer_scores=layer_scores,
+            dsp_readiness=dsp_readiness,
+            issues=issues,
+            suggestions=[],
+        )
+
+        pdf_bytes = ReportGenerator().build(data)
+
+        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in release_title)[:60]
+        filename = f"SONGGATE_DEMO_{safe}.pdf"
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    except Exception as exc:
+        logger.exception("demo_pdf error: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to generate PDF report.")
 
 
 @router.get("/sample-xml")

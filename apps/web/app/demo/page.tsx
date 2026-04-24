@@ -404,6 +404,7 @@ export default function DemoPage() {
   const [scanFormat, setScanFormat]     = useState<string>("xml");
   const [devtoolsNotice, setDevtoolsNotice] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; content: string } | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Register devtools alert + right-click protection
@@ -590,6 +591,34 @@ export default function DemoPage() {
     URL.revokeObjectURL(url);
   }
 
+  // ── Demo PDF export ───────────────────────────────────────────────────────
+
+  async function exportDemoPDF() {
+    if (!scanResult || pdfLoading) return;
+    setPdfLoading(true);
+    try {
+      const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      const res = await fetch(`${API}/api/demo/pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(scanResult),
+      });
+      if (!res.ok) throw new Error("PDF generation failed.");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safe = (scanResult.release_title || "scan").replace(/[^\w-]/g, "_").slice(0, 60);
+      a.href = url;
+      a.download = `SONGGATE_DEMO_${safe}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // silent — user can retry
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
   // ── Results grouping ──────────────────────────────────────────────────────
 
   function groupedResults() {
@@ -747,22 +776,24 @@ export default function DemoPage() {
                   <Download className="h-3 w-3" />
                   JSON
                 </button>
-                {uploadedFile ? (
+                <button
+                  onClick={exportDemoPDF}
+                  disabled={pdfLoading}
+                  className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  {pdfLoading
+                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                    : <Download className="h-3 w-3" />}
+                  PDF
+                </button>
+                {uploadedFile && (
                   <button
                     onClick={downloadFile}
-                    className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                    className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
                   >
                     <Download className="h-3 w-3" />
-                    Download file
+                    Source file
                   </button>
-                ) : (
-                  <Link
-                    href="/sign-up"
-                    className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
-                  >
-                    <Lock className="h-3 w-3" />
-                    Create account for PDF
-                  </Link>
                 )}
               </div>
             </div>
