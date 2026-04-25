@@ -1387,7 +1387,7 @@ export default function DemoPage() {
                   Start free trial <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
-                  href="mailto:andrew@housesonhills.io?subject=SONGGATE Pilot&body=Hi, I'd like to book a call to discuss a SONGGATE pilot."
+                  href="mailto:andrew@housesonhills.io?subject=SONGGATE Demo Request"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
@@ -1599,7 +1599,7 @@ export default function DemoPage() {
                   Start free trial <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
-                  href="mailto:andrew@housesonhills.io?subject=SONGGATE Pilot&body=Hi, I'd like to book a call to discuss a SONGGATE pilot."
+                  href="mailto:andrew@housesonhills.io?subject=SONGGATE Demo Request"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
@@ -1820,7 +1820,7 @@ export default function DemoPage() {
                   Start free trial <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
-                  href="mailto:andrew@housesonhills.io?subject=SONGGATE Pilot&body=Hi, I'd like to book a call to discuss a SONGGATE pilot."
+                  href="mailto:andrew@housesonhills.io?subject=SONGGATE Demo Request"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"

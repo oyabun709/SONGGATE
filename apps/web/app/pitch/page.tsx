@@ -55,13 +55,13 @@ function Slide01Cover() {
         <span className="text-white font-medium">Catch errors before they cost you.</span>
       </p>
       <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full sm:w-auto px-4 sm:px-0">
-        <button
-          onClick={copyEmail}
+        <a
+          href="mailto:andrew@housesonhills.io?subject=SONGGATE Demo Request"
           className="flex items-center justify-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-white transition-opacity"
           style={{ background: ACCENT }}
         >
-          {copied ? "Email copied!" : <>Book a demo <ArrowRight className="h-4 w-4" /></>}
-        </button>
+          Book a demo <ArrowRight className="h-4 w-4" />
+        </a>
         <Link
           href="/onboarding"
           className="flex items-center justify-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-slate-300 border border-slate-700 hover:border-slate-500 transition-colors"

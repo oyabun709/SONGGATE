@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
@@ -68,14 +68,6 @@ const PASSED = [
 export default function LandingPage() {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
-  const [copied, setCopied] = useState<string | null>(null);
-
-  function copyEmail(id: string) {
-    navigator.clipboard.writeText("andrew@housesonhills.io").catch(() => {});
-    setCopied(id);
-    setTimeout(() => setCopied(null), 2000);
-  }
-
   useEffect(() => {
     if (isLoaded && isSignedIn) {
       router.replace("/dashboard");
@@ -98,12 +90,12 @@ export default function LandingPage() {
             >
               Sign in
             </Link>
-            <button
-              onClick={() => copyEmail("nav")}
+            <a
+              href="mailto:andrew@housesonhills.io?subject=SONGGATE Demo Request"
               className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
             >
-              {copied === "nav" ? "Copied!" : "Book a demo"}
-            </button>
+              Book a demo
+            </a>
           </div>
         </div>
       </header>
@@ -122,12 +114,12 @@ export default function LandingPage() {
           for every major DSP.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-          <button
-            onClick={() => copyEmail("hero")}
+          <a
+            href="mailto:andrew@housesonhills.io?subject=SONGGATE Demo Request"
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
           >
-            {copied === "hero" ? "Email copied!" : <>Book a demo <ArrowRight className="h-4 w-4" /></>}
-          </button>
+            Book a demo <ArrowRight className="h-4 w-4" />
+          </a>
           <Link
             href="/demo"
             className="flex items-center gap-2 rounded-lg border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -262,12 +254,12 @@ export default function LandingPage() {
           >
             Try the live demo <ArrowRight className="h-4 w-4" />
           </Link>
-          <button
-            onClick={() => copyEmail("schedule")}
+          <a
+            href="mailto:andrew@housesonhills.io?subject=SONGGATE Demo Request"
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-8 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            {copied === "schedule" ? "Email copied!" : <>Schedule a call <ArrowRight className="h-4 w-4" /></>}
-          </button>
+            Schedule a call <ArrowRight className="h-4 w-4" />
+          </a>
         </div>
         <p className="mt-5 text-sm text-slate-400">
           Reach us directly at{" "}
@@ -285,12 +277,12 @@ export default function LandingPage() {
         <p className="mb-8 text-indigo-200">
           Talk to us — we&apos;ll show you exactly how SONGGATE fits your workflow.
         </p>
-        <button
-          onClick={() => copyEmail("bottom")}
+        <a
+          href="mailto:andrew@housesonhills.io?subject=SONGGATE Demo Request"
           className="inline-flex items-center gap-2 rounded-lg bg-white px-8 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors"
         >
-          {copied === "bottom" ? "Email copied!" : <>Get in touch <ArrowRight className="h-4 w-4" /></>}
-        </button>
+          Get in touch <ArrowRight className="h-4 w-4" />
+        </a>
         <p className="mt-5 text-sm text-indigo-200">
           or email{" "}
           <a href="mailto:andrew@housesonhills.io" className="underline hover:text-white">
