@@ -664,7 +664,7 @@ export default function DemoPage() {
   // ── Animate progress layers ───────────────────────────────────────────────
 
   async function animateLayers(
-    scanPromise: Promise<DemoScan | BulkDemoScan>,
+    scanPromise: Promise<DemoScan | BulkDemoScan | ISRCDemoScan>,
     fmt: string = "xml",
   ) {
     const completed = new Set<string>();
@@ -675,7 +675,7 @@ export default function DemoPage() {
     setScanFormat(fmt);
     setPhase("scanning");
 
-    let result: DemoScan | BulkDemoScan | null = null;
+    let result: DemoScan | BulkDemoScan | ISRCDemoScan | null = null;
     let fetchError: string | null = null;
 
     // Start the real scan in parallel with the animation
