@@ -936,6 +936,100 @@ async def regenerate_report(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# GET /scans/{scan_id}/export/bulk/pdf
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.get("/scans/{scan_id}/export/bulk/pdf")
+async def export_bulk_scan_pdf(
+    scan_id: str,
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+):
+    """
+    Generate and stream a PDF report for a completed bulk registration scan.
+
+    Returns a 5-page PDF:
+      Page 1 — Cover (summary + score)
+      Page 2 — Cross-Release Issues
+      Page 3 — Per-Release Issues
+      Page 4 — Identifier Coverage
+      Page 5 — Clean Releases
+
+    Only available for scans whose layers_run includes 'bulk_registration'.
+    Requires a completed scan (status == 'complete').
+    """
+    from services.reports.bulk_report import BulkReportData, BulkReportGenerator
+
+    scan = await _get_scan_for_org(db, scan_id, org.id)
+    if not scan:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Scan not found")
+
+    if scan.status != "complete":
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="Scan is not yet complete.")
+
+    layers_run = list(scan.layers_run or [])
+    if "bulk_registration" not in layers_run:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail="This endpoint is only available for bulk registration scans.",
+        )
+
+    vf = scan.validated_fields or {}
+
+    # Build all_releases list from per_release_issues (includes clean rows too).
+    # The scorer stores per-row data keyed by row_number; we supplement with rows
+    # that had no issues by combining cross+per data.
+    per_release_issues: list[dict] = vf.get("per_release_issues", [])
+    cross_release_issues: list[dict] = vf.get("cross_release_issues", [])
+    identifier_coverage: dict = vf.get("identifier_coverage", {})
+
+    # Build all_releases: merge from per_release_issues (rows with issues) +
+    # any row data stored in validated_fields; if not available, leave empty
+    # (the clean-releases page will be omitted gracefully).
+    all_releases_raw: list[dict] = vf.get("all_releases", [])
+
+    org_result = await db.execute(
+        select(Organization).where(Organization.id == org.id)
+    )
+    org_obj = org_result.scalar_one_or_none()
+    org_name = org_obj.name if org_obj else ""
+
+    # Reconstruct filename from metadata if available
+    md = (scan.validated_fields or {})
+    filename = md.get("filename") or None
+
+    report_data = BulkReportData(
+        org_name=org_name,
+        scan_id=scan_id,
+        scan_date=scan.completed_at or scan.created_at,
+        filename=filename,
+        score=float(scan.readiness_score or 0.0),
+        grade=scan.grade.value if scan.grade else "FAIL",
+        critical_count=int(scan.critical_count or 0),
+        warning_count=int(scan.warning_count or 0),
+        info_count=int(scan.info_count or 0),
+        total_releases=int(vf.get("total_releases") or 0),
+        releases_with_issues=int(vf.get("releases_with_issues") or 0),
+        cross_release_issues=cross_release_issues,
+        per_release_issues=per_release_issues,
+        identifier_coverage=identifier_coverage,
+        all_releases=all_releases_raw,
+    )
+
+    pdf_bytes = BulkReportGenerator().build(report_data)
+
+    date_str = (scan.completed_at or scan.created_at).strftime("%Y-%m-%d")
+    safe_org  = re.sub(r"[^\w\-]", "_", org_name)[:40] if org_name else "bulk"
+    filename_out = f"SONGGATE_Bulk_{safe_org}_{date_str}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename_out}"'},
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # GET /analytics/overview — full analytics payload, Clerk JWT auth, no tier gate
 # ──────────────────────────────────────────────────────────────────────────────
 

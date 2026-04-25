@@ -268,6 +268,7 @@ export default function ScanResultsPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [csvLoading, setCsvLoading] = useState(false);
   const [jsonLoading, setJsonLoading] = useState(false);
+  const [bulkPdfLoading, setBulkPdfLoading] = useState(false);
 
   const fetchScan = useCallback(async (tok?: string) => {
     const t = tok ?? token;
@@ -341,6 +342,36 @@ export default function ScanResultsPage() {
       /* noop — button just stops spinning */
     } finally {
       setReportLoading(false);
+    }
+  }
+
+  async function handleDownloadBulkPdf() {
+    if (!token || !scan || scan.status !== "complete") return;
+    setBulkPdfLoading(true);
+    try {
+      const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      const res = await fetch(`${API}/scans/${params.scanId}/export/bulk/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail ?? "Failed to generate report");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = res.headers.get("content-disposition") ?? "";
+      const match = cd.match(/filename="([^"]+)"/);
+      a.download = match?.[1] ?? `SONGGATE_Bulk_${params.scanId.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      /* noop */
+    } finally {
+      setBulkPdfLoading(false);
     }
   }
 
@@ -458,23 +489,43 @@ export default function ScanResultsPage() {
             {jsonLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             JSON
           </button>
-          <button
-            onClick={handleDownloadReport}
-            disabled={reportLoading || !scan || scan.status !== "complete"}
-            className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
-          >
-            {reportLoading ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Generating…
-              </>
-            ) : (
-              <>
-                <Download className="h-3.5 w-3.5" />
-                PDF
-              </>
-            )}
-          </button>
+          {isBulkScan ? (
+            <button
+              onClick={handleDownloadBulkPdf}
+              disabled={bulkPdfLoading || scan.status !== "complete"}
+              className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {bulkPdfLoading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5" />
+                  PDF Report
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={handleDownloadReport}
+              disabled={reportLoading || scan.status !== "complete"}
+              className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {reportLoading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Generating…
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5" />
+                  PDF
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
