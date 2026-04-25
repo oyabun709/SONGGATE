@@ -75,6 +75,8 @@ interface BulkPerReleaseEntry {
   ean: string;
   artist: string;
   title: string;
+  isni?: string | null;
+  iswc?: string | null;
   issues: Array<{
     id: string;
     severity: string;
@@ -82,6 +84,18 @@ interface BulkPerReleaseEntry {
     message: string;
     fix_hint: string;
   }>;
+}
+
+interface IdentifierCoverage {
+  total_releases: number;
+  with_isni: number;
+  with_isni_pct: number;
+  with_iswc: number;
+  with_iswc_pct: number;
+  with_both: number;
+  with_neither: number;
+  isni_format_errors: number;
+  iswc_format_errors: number;
 }
 
 interface BulkDemoScan {
@@ -100,6 +114,8 @@ interface BulkDemoScan {
   total_issues: number;
   cross_release_issues: BulkIssue[];
   per_release_issues: BulkPerReleaseEntry[];
+  identifier_coverage?: IdentifierCoverage;
+  enrichment_status?: string;
   completed_at: string;
 }
 
@@ -1073,6 +1089,95 @@ export default function DemoPage() {
                   {bulkResult.per_release_issues.map(entry => (
                     <BulkPerReleaseCard key={entry.row_number} entry={entry} />
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Identifier coverage */}
+            {bulkResult.identifier_coverage && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                    Identifier Coverage
+                    <span className={cn(
+                      "rounded-full px-2 py-0.5 text-xs font-semibold",
+                      bulkResult.identifier_coverage.with_isni_pct >= 80
+                        ? "bg-emerald-100 text-emerald-700"
+                        : bulkResult.identifier_coverage.with_isni_pct >= 50
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-red-100 text-red-700",
+                    )}>
+                      {bulkResult.identifier_coverage.with_isni_pct}% ISNI
+                    </span>
+                  </h2>
+                  <span className="text-xs text-slate-400">ISNI &amp; ISWC presence across catalog</span>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-center">
+                      <p className="text-2xl font-bold text-indigo-700 tabular-nums">
+                        {bulkResult.identifier_coverage.with_isni_pct}%
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        With ISNI
+                        <span className="ml-1 text-slate-400">
+                          ({bulkResult.identifier_coverage.with_isni}/{bulkResult.identifier_coverage.total_releases})
+                        </span>
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-center">
+                      <p className="text-2xl font-bold text-indigo-700 tabular-nums">
+                        {bulkResult.identifier_coverage.with_iswc_pct}%
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        With ISWC
+                        <span className="ml-1 text-slate-400">
+                          ({bulkResult.identifier_coverage.with_iswc}/{bulkResult.identifier_coverage.total_releases})
+                        </span>
+                      </p>
+                    </div>
+                    <div className={cn(
+                      "rounded-lg border px-4 py-3 text-center",
+                      bulkResult.identifier_coverage.with_neither > 0
+                        ? "border-amber-100 bg-amber-50"
+                        : "border-emerald-100 bg-emerald-50",
+                    )}>
+                      <p className={cn(
+                        "text-2xl font-bold tabular-nums",
+                        bulkResult.identifier_coverage.with_neither > 0 ? "text-amber-600" : "text-emerald-600",
+                      )}>
+                        {bulkResult.identifier_coverage.with_neither}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">Missing both</p>
+                    </div>
+                    {(bulkResult.identifier_coverage.isni_format_errors + bulkResult.identifier_coverage.iswc_format_errors) > 0 ? (
+                      <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-center">
+                        <p className="text-2xl font-bold text-red-600 tabular-nums">
+                          {bulkResult.identifier_coverage.isni_format_errors + bulkResult.identifier_coverage.iswc_format_errors}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">Format errors</p>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-center">
+                        <p className="text-2xl font-bold text-emerald-600 tabular-nums">
+                          {bulkResult.identifier_coverage.with_both}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">With both</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="mt-4 text-xs text-slate-500 leading-relaxed">
+                    ISNI and ISWC identifiers enable accurate artist and works matching in{" "}
+                    <span className="font-medium text-slate-700">Luminate Data Enrichment</span>.
+                    Missing identifiers reduce downstream match rates for chart tracking, royalty routing, and DSP delivery.
+                    {bulkResult.enrichment_status === "pending_api_integration" && (
+                      <span className="ml-1 text-indigo-600">
+                        Connect to Luminate ArtistMatch and WorksMatch to auto-fill missing identifiers.
+                      </span>
+                    )}
+                  </p>
                 </div>
               </div>
             )}

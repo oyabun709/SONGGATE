@@ -34,9 +34,10 @@ const LAYER_LABELS: Record<string, string> = {
   fraud: "Fraud Screening",
   artwork: "Artwork Validation",
   enrichment: "MusicBrainz Enrichment",
+  bulk_registration: "Bulk Registration",
 };
 
-const LAYER_ORDER = ["ddex", "metadata", "fraud", "artwork", "enrichment"];
+const LAYER_ORDER = ["ddex", "metadata", "fraud", "artwork", "enrichment", "bulk_registration"];
 
 const SEV_ORDER: Record<string, number> = { critical: 0, error: 0, warning: 1, info: 2 };
 
@@ -396,7 +397,13 @@ export default function ScanResultsPage() {
 
   const isRunning = scan.status === "running" || scan.status === "queued";
   const enrichmentResults = scan.results.filter((r) => r.layer === "enrichment");
-  const nonEnrichmentLayers = LAYER_ORDER.filter((l) => l !== "enrichment" && resultsByLayer[l]?.length);
+  const isBulkScan = scan.layers_run?.includes("bulk_registration");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bulkValidatedFields = isBulkScan ? (scan.validated_fields as any) : null;
+  const identifierCoverage = bulkValidatedFields?.identifier_coverage ?? null;
+  const nonEnrichmentLayers = LAYER_ORDER.filter(
+    (l) => l !== "enrichment" && l !== "bulk_registration" && resultsByLayer[l]?.length
+  );
 
   // Per-layer scores for mini bars (simple: 100 minus proportional deductions)
   function layerScore(layer: string): number {
@@ -510,7 +517,7 @@ export default function ScanResultsPage() {
             </div>
 
             <div className="space-y-3">
-              {LAYER_ORDER.filter((l) => l !== "enrichment").map((layer) => {
+              {LAYER_ORDER.filter((l) => l !== "enrichment" && l !== "bulk_registration").map((layer) => {
                 const lScore = layerScore(layer);
                 const color =
                   lScore >= 80 ? "bg-emerald-500" : lScore >= 60 ? "bg-amber-400" : "bg-red-500";
@@ -587,6 +594,100 @@ export default function ScanResultsPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── BULK REGISTRATION layer issues ───────────────────────────── */}
+      {isBulkScan && resultsByLayer["bulk_registration"]?.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              Bulk Registration
+              {(resultsByLayer["bulk_registration"] ?? []).filter((r) => r.severity === "critical" && !r.resolved).length > 0 && (
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                  {(resultsByLayer["bulk_registration"] ?? []).filter((r) => r.severity === "critical" && !r.resolved).length} critical
+                </span>
+              )}
+              {(resultsByLayer["bulk_registration"] ?? []).filter((r) => r.severity === "warning" && !r.resolved).length > 0 && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                  {(resultsByLayer["bulk_registration"] ?? []).filter((r) => r.severity === "warning" && !r.resolved).length} warnings
+                </span>
+              )}
+            </h2>
+            <span className="text-xs text-slate-400">
+              {(resultsByLayer["bulk_registration"] ?? []).length} finding{(resultsByLayer["bulk_registration"] ?? []).length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {(resultsByLayer["bulk_registration"] ?? []).map((r) => (
+              <IssueCard
+                key={r.id}
+                result={r}
+                scanId={params.scanId}
+                token={token}
+                onResolved={handleResolved}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── IDENTIFIER COVERAGE (bulk scans only) ─────────────────────── */}
+      {isBulkScan && identifierCoverage && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-800">Identifier Coverage</h2>
+            <span className="text-xs text-slate-400">ISNI &amp; ISWC across catalog</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-indigo-700 tabular-nums">
+                {identifierCoverage.with_isni_pct}%
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                With ISNI
+                <span className="ml-1 text-slate-400">({identifierCoverage.with_isni}/{identifierCoverage.total_releases})</span>
+              </p>
+            </div>
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-center">
+              <p className="text-2xl font-bold text-indigo-700 tabular-nums">
+                {identifierCoverage.with_iswc_pct}%
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                With ISWC
+                <span className="ml-1 text-slate-400">({identifierCoverage.with_iswc}/{identifierCoverage.total_releases})</span>
+              </p>
+            </div>
+            <div className={cn(
+              "rounded-lg border px-4 py-3 text-center",
+              identifierCoverage.with_neither > 0 ? "border-amber-100 bg-amber-50" : "border-emerald-100 bg-emerald-50",
+            )}>
+              <p className={cn("text-2xl font-bold tabular-nums",
+                identifierCoverage.with_neither > 0 ? "text-amber-600" : "text-emerald-600",
+              )}>
+                {identifierCoverage.with_neither}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">Missing both</p>
+            </div>
+            <div className={cn(
+              "rounded-lg border px-4 py-3 text-center",
+              (identifierCoverage.isni_format_errors + identifierCoverage.iswc_format_errors) > 0
+                ? "border-red-100 bg-red-50"
+                : "border-emerald-100 bg-emerald-50",
+            )}>
+              <p className={cn("text-2xl font-bold tabular-nums",
+                (identifierCoverage.isni_format_errors + identifierCoverage.iswc_format_errors) > 0
+                  ? "text-red-600" : "text-emerald-600",
+              )}>
+                {identifierCoverage.isni_format_errors + identifierCoverage.iswc_format_errors}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">Format errors</p>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            ISNI and ISWC identifiers enable accurate matching in Luminate Data Enrichment.
+            Missing identifiers reduce match rates for chart tracking, royalty routing, and DSP delivery.
+          </p>
         </div>
       )}
 

@@ -240,10 +240,13 @@ class TestPerReleaseValidation:
     def _validate_one(self, release: ParsedRelease, today: date = date(2026, 4, 25)):
         return validate_bulk_file([release], today=today)
 
-    def test_clean_release_no_issues(self):
+    def test_clean_release_no_score_impacting_issues(self):
+        # A release with all required fields should have no critical or warning issues.
+        # Phase 2 adds ISNI/ISWC missing notices (info severity — no score impact).
         r = make_release()
         issues = self._validate_one(r)
-        assert issues == []
+        score_issues = [i for i in issues if i.severity in ("critical", "warning")]
+        assert score_issues == []
 
     def test_invalid_ean_triggers_critical(self):
         r = make_release(ean="123")
@@ -356,7 +359,7 @@ class TestCrossReleaseValidation:
         assert len(info_issues) >= 1
 
     def test_future_date_under_6_months_no_info(self):
-        # 3 months out — should not trigger
+        # 3 months out — should not trigger a date info notice
         r = make_release(date_raw="072526", row=1)  # July 25, 2026 — ~3 months out
         r = ParsedRelease(
             ean=r.ean, artist=r.artist, title=r.title,
@@ -364,8 +367,8 @@ class TestCrossReleaseValidation:
             imprint=r.imprint, label=r.label, narm_config=r.narm_config, row_number=1,
         )
         issues = validate_bulk_file([r], today=date(2026, 4, 25))
-        info_issues = [i for i in issues if i.severity == "info"]
-        assert len(info_issues) == 0
+        date_info = [i for i in issues if i.severity == "info" and "Date" in i.rule_name]
+        assert len(date_info) == 0
 
 
 # ── Scorer tests ──────────────────────────────────────────────────────────────
@@ -376,6 +379,7 @@ class TestBulkScorer:
         return BulkIssue(
             id="test",
             severity=severity,
+            rule_id="",
             rule_name="Test",
             message="Test",
             fix_hint="Fix it",
@@ -453,12 +457,12 @@ class TestBulkScorer:
     def test_cross_release_issues_separated(self):
         from services.bulk.bulk_validator import BulkIssue
         cross = BulkIssue(
-            id="x", severity="critical", rule_name="Dup EAN",
+            id="x", severity="critical", rule_id="BULK_EAN_DUPLICATE", rule_name="Dup EAN",
             message="msg", fix_hint="fix", scope="cross_release",
             row_number=None, affected_ean="123", affected_rows=[1, 2],
         )
         per = BulkIssue(
-            id="y", severity="warning", rule_name="Missing Label",
+            id="y", severity="warning", rule_id="BULK_IMPRINT_MISSING", rule_name="Missing Label",
             message="msg", fix_hint="fix", scope="per_release",
             row_number=1, affected_ean=None, affected_rows=[],
         )
@@ -530,3 +534,204 @@ class TestSampleFile:
         issues = validate_bulk_file(releases, today=date(2026, 4, 25))
         ean_issues = [i for i in issues if i.scope == "per_release" and "EAN" in i.rule_name]
         assert len(ean_issues) == 0  # all EANs in sample are valid format
+
+    def test_sample_four_releases_have_isni(self):
+        content = self._load_sample()
+        releases = parse_bulk_file(content)
+        with_isni = [r for r in releases if r.isni]
+        assert len(with_isni) == 4
+
+    def test_sample_four_releases_have_iswc(self):
+        content = self._load_sample()
+        releases = parse_bulk_file(content)
+        with_iswc = [r for r in releases if r.iswc]
+        assert len(with_iswc) == 4
+
+    def test_sample_identifier_coverage_stats(self):
+        content = self._load_sample()
+        releases = parse_bulk_file(content)
+        issues = validate_bulk_file(releases, today=date(2026, 4, 25))
+        result = score_bulk_scan(releases, issues)
+        cov = result["identifier_coverage"]
+        assert cov["total_releases"] == 10
+        assert cov["with_isni"] == 4
+        assert cov["with_iswc"] == 4
+        assert cov["with_both"] == 4
+        assert cov["with_neither"] == 6
+
+
+# ── ISNI validation ───────────────────────────────────────────────────────────
+
+class TestISNIValidation:
+    def test_valid_isni_passes(self):
+        from services.bulk.bulk_validator import validate_isni
+        assert validate_isni("0000000121455467") is None
+
+    def test_valid_isni_with_hyphens_passes(self):
+        from services.bulk.bulk_validator import validate_isni
+        assert validate_isni("0000-0001-2145-5467") is None
+
+    def test_too_short_isni_fails(self):
+        from services.bulk.bulk_validator import validate_isni
+        assert validate_isni("000000012145546") is not None  # 15 digits
+
+    def test_too_long_isni_fails(self):
+        from services.bulk.bulk_validator import validate_isni
+        assert validate_isni("00000001214554670") is not None  # 17 digits
+
+    def test_non_digit_isni_fails(self):
+        from services.bulk.bulk_validator import validate_isni
+        assert validate_isni("000000012145546X") is not None
+
+    def test_all_zero_isni_fails(self):
+        from services.bulk.bulk_validator import validate_isni
+        assert validate_isni("0000000000000000") is not None
+
+    def test_missing_isni_triggers_info_not_warning(self):
+        r = make_release()  # no ISNI (default)
+        issues = validate_bulk_file([r], today=date(2026, 4, 25))
+        isni_issues = [i for i in issues if i.rule_id == "BULK_ISNI_MISSING"]
+        assert len(isni_issues) == 1
+        assert isni_issues[0].severity == "info"
+
+    def test_invalid_isni_triggers_warning(self):
+        from services.bulk.bulk_parser import ParsedRelease
+        r = ParsedRelease(
+            ean="0753088935176", artist="Bill Evans Trio", title="Explorations",
+            release_date_raw="010626", release_date_parsed=date(2026, 1, 6),
+            imprint="Riverside", label="Fantasy", narm_config="00", row_number=1,
+            isni="INVALID123",
+        )
+        issues = validate_bulk_file([r], today=date(2026, 4, 25))
+        assert any(i.rule_id == "BULK_ISNI_FORMAT" and i.severity == "warning" for i in issues)
+
+    def test_isni_inconsistency_triggers_warning(self):
+        from services.bulk.bulk_parser import ParsedRelease
+        r1 = ParsedRelease(
+            ean="0753088935176", artist="Bill Evans Trio", title="Explorations",
+            release_date_raw="010626", release_date_parsed=date(2026, 1, 6),
+            imprint="Riverside", label="Fantasy", narm_config="00", row_number=1,
+            isni="0000000121455467",
+        )
+        r2 = ParsedRelease(
+            ean="0820233171922", artist="Bill Evans Trio", title="Waltz for Debby",
+            release_date_raw="010626", release_date_parsed=date(2026, 1, 6),
+            imprint="Riverside", label="Fantasy", narm_config="00", row_number=2,
+            isni=None,  # same artist, no ISNI
+        )
+        issues = validate_bulk_file([r1, r2], today=date(2026, 4, 25))
+        assert any(i.rule_id == "BULK_ISNI_INCONSISTENT" and i.severity == "warning" for i in issues)
+
+    def test_isni_conflict_triggers_critical(self):
+        from services.bulk.bulk_parser import ParsedRelease
+        r1 = ParsedRelease(
+            ean="0753088935176", artist="Bill Evans Trio", title="Explorations",
+            release_date_raw="010626", release_date_parsed=date(2026, 1, 6),
+            imprint="Riverside", label="Fantasy", narm_config="00", row_number=1,
+            isni="0000000121455467",
+        )
+        r2 = ParsedRelease(
+            ean="0820233171922", artist="Bill Evans Trio", title="Waltz for Debby",
+            release_date_raw="010626", release_date_parsed=date(2026, 1, 6),
+            imprint="Riverside", label="Fantasy", narm_config="00", row_number=2,
+            isni="0000000504174930",  # different ISNI, same artist
+        )
+        issues = validate_bulk_file([r1, r2], today=date(2026, 4, 25))
+        assert any(i.rule_id == "BULK_ISNI_CONFLICTING" and i.severity == "critical" for i in issues)
+
+
+# ── ISWC validation ───────────────────────────────────────────────────────────
+
+class TestISWCValidation:
+    def test_valid_iswc_with_hyphens_passes(self):
+        from services.bulk.bulk_validator import validate_iswc
+        assert validate_iswc("T-070195720-5") is None
+
+    def test_valid_iswc_without_hyphens_passes(self):
+        from services.bulk.bulk_validator import validate_iswc
+        assert validate_iswc("T0701957205") is None
+
+    def test_invalid_iswc_wrong_prefix_fails(self):
+        from services.bulk.bulk_validator import validate_iswc
+        assert validate_iswc("W-070195720-5") is not None
+
+    def test_invalid_iswc_too_few_digits_fails(self):
+        from services.bulk.bulk_validator import validate_iswc
+        assert validate_iswc("T-07019572-5") is not None  # only 8 middle digits
+
+    def test_missing_iswc_triggers_info_not_warning(self):
+        r = make_release()  # no ISWC (default)
+        issues = validate_bulk_file([r], today=date(2026, 4, 25))
+        iswc_issues = [i for i in issues if i.rule_id == "BULK_ISWC_MISSING"]
+        assert len(iswc_issues) == 1
+        assert iswc_issues[0].severity == "info"
+
+    def test_invalid_iswc_triggers_warning(self):
+        from services.bulk.bulk_parser import ParsedRelease
+        r = ParsedRelease(
+            ean="0753088935176", artist="Bill Evans Trio", title="Explorations",
+            release_date_raw="010626", release_date_parsed=date(2026, 1, 6),
+            imprint="Riverside", label="Fantasy", narm_config="00", row_number=1,
+            iswc="BADFORMAT",
+        )
+        issues = validate_bulk_file([r], today=date(2026, 4, 25))
+        assert any(i.rule_id == "BULK_ISWC_FORMAT" and i.severity == "warning" for i in issues)
+
+
+# ── Identifier coverage ───────────────────────────────────────────────────────
+
+class TestIdentifierCoverage:
+    def test_zero_coverage_when_no_identifiers(self):
+        releases = [make_release(row=i) for i in range(1, 4)]
+        issues = validate_bulk_file(releases, today=date(2026, 4, 25))
+        result = score_bulk_scan(releases, issues)
+        cov = result["identifier_coverage"]
+        assert cov["total_releases"] == 3
+        assert cov["with_isni"] == 0
+        assert cov["with_isni_pct"] == 0
+        assert cov["with_iswc"] == 0
+        assert cov["with_neither"] == 3
+
+    def test_partial_coverage_stats(self):
+        from services.bulk.bulk_parser import ParsedRelease
+        r1 = ParsedRelease(
+            ean="0753088935176", artist="A", title="T",
+            release_date_raw="041826", release_date_parsed=date(2026, 4, 18),
+            imprint="L", label="L", narm_config="00", row_number=1,
+            isni="0000000121455467", iswc="T-070195720-5",
+        )
+        r2 = make_release(row=2)  # no identifiers
+        issues = validate_bulk_file([r1, r2], today=date(2026, 4, 25))
+        result = score_bulk_scan([r1, r2], issues)
+        cov = result["identifier_coverage"]
+        assert cov["total_releases"] == 2
+        assert cov["with_isni"] == 1
+        assert cov["with_isni_pct"] == 50
+        assert cov["with_iswc"] == 1
+        assert cov["with_both"] == 1
+        assert cov["with_neither"] == 1
+
+    def test_enrichment_status_is_stub(self):
+        result = score_bulk_scan([], [])
+        assert result["enrichment_status"] == "pending_api_integration"
+
+
+# ── Enricher stub ─────────────────────────────────────────────────────────────
+
+class TestBulkEnricher:
+    def test_enrich_release_returns_stub(self):
+        from services.bulk.bulk_enricher import BulkEnricher
+        enricher = BulkEnricher()
+        out = enricher.enrich_release({"artist": "Bill Evans", "ean": "0753088935176"})
+        assert out["enrichment_status"] == "pending_api_integration"
+        assert out["suggested_isni"] is None
+        assert out["suggested_iswc"] is None
+        assert out["artist"] == "Bill Evans"
+
+    def test_enrich_batch_returns_all(self):
+        from services.bulk.bulk_enricher import BulkEnricher
+        enricher = BulkEnricher()
+        releases = [{"artist": "A"}, {"artist": "B"}, {"artist": "C"}]
+        out = enricher.enrich_batch(releases)
+        assert len(out) == 3
+        assert all(r["enrichment_status"] == "pending_api_integration" for r in out)

@@ -1,11 +1,11 @@
-EAN|Artist|Title|Release Date|Imprint|Label|NARM Config
-0613365096917|RZA & Juice Crew|Bobby Digital Presents: The Juice Crew (RSD 2026)|041826|||00
-0613365096917|RZA, Juice Crew|Bobby Digital Presents: The Juice Crew|041826|||00
-0711574971718|Wendell Harrison & Tribe|A Tribute To Pharoah Sanders|041826|||00
-0711574971718|Wendell Harrison & Tribe|A Tribute to Pharoah Sanders|041826|||00
-0810179612641|Various Artists from Curaga Records and Chill Ghost Records|Video Game LoFi: Sleepy Pokémon Beats|041826|||00
-0199957600262|King Gizzard and the Lizard Wizard|Big Fig Wasp (Bootleg By Having Fun Records)|040126|||00
-0753088935176|Bill Evans Trio|Explorations|010626|Riverside Records|Fantasy Records|00
-0820233171922|YOASOBI|E-SIDE 4|042426|Sony Music|Sony Music Entertainment Japan|02
-0196874342671|The Kid LAROI|BEFORE I FORGET (DELUXE)|042426|Columbia|Sony Music|02
-0199584421445|Foo Fighters|Your Favorite Toy|042426|Roswell Records|RCA|04
+EAN|Artist|Title|Release Date|Imprint|Label|NARM|ISNI|ISWC
+0613365096917|RZA & Juice Crew|Bobby Digital Presents: The Juice Crew (RSD 2026)|041826|||00||
+0613365096917|RZA, Juice Crew|Bobby Digital Presents: The Juice Crew|041826|||00||
+0711574971718|Wendell Harrison & Tribe|A Tribute To Pharoah Sanders|041826|||00||
+0711574971718|Wendell Harrison & Tribe|A Tribute to Pharoah Sanders|041826|||00||
+0810179612641|Various Artists from Curaga Records and Chill Ghost Records|Video Game LoFi: Sleepy Pokémon Beats|041826|||00||
+0199957600262|King Gizzard and the Lizard Wizard|Big Fig Wasp (Bootleg By Having Fun Records)|040126|||00||
+0753088935176|Bill Evans Trio|Explorations|010626|Riverside Records|Fantasy Records|00|0000000121455467|T-070195720-5
+0820233171922|YOASOBI|E-SIDE 4|042426|Sony Music|Sony Music Entertainment Japan|02|0000000504174930|T-930214052-3
+0196874342671|The Kid LAROI|BEFORE I FORGET (DELUXE)|042426|Columbia|Sony Music|02|0000000494672732|T-324109283-1
+0199584421445|Foo Fighters|Your Favorite Toy|042426|Roswell Records|RCA|04|0000000122939631|T-201938472-6

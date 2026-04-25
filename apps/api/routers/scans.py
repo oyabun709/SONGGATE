@@ -142,6 +142,7 @@ async def create_bulk_scan(
     from services.bulk.bulk_scorer import score_bulk_scan
     from models.release import Release, SubmissionFormat, ReleaseStatus
     from models.scan import Scan, ScanStatus, ScanGrade
+    from models.scan_result import ScanResult, ResultStatus
 
     content = await file.read()
     if len(content) > 5 * 1024 * 1024:
@@ -214,7 +215,38 @@ async def create_bulk_scan(
         "cross_release_issues": scan_result["cross_release_issues"],
         "per_release_issues": scan_result["per_release_issues"],
     }
+    # Store supplemental bulk data (identifier coverage, enrichment status) in
+    # validated_fields.  Per-release and cross-release issues go into ScanResult
+    # rows so they satisfy the FK constraint on rules.id (seeded by migration 0007).
+    db_scan.validated_fields = {
+        "bulk_registration": True,
+        "identifier_coverage": scan_result["identifier_coverage"],
+        "enrichment_status": scan_result["enrichment_status"],
+    }
     db.add(db_scan)
+    await db.flush()   # flush scan so FK on scan_results.scan_id resolves
+
+    # Persist each issue as a ScanResult row
+    for issue in issues:
+        sr_status = ResultStatus.fail if issue.severity == "critical" else ResultStatus.warn
+        sr = ScanResult(
+            id=uuid.uuid4(),
+            scan_id=db_scan.id,
+            layer="bulk_registration",
+            rule_id=issue.rule_id,
+            severity=issue.severity,
+            status=sr_status,
+            message=issue.message,
+            fix_hint=issue.fix_hint,
+            metadata_={
+                "scope": issue.scope,
+                "row_number": issue.row_number,
+                "affected_ean": issue.affected_ean,
+                "affected_rows": issue.affected_rows,
+            },
+            created_at=now,
+        )
+        db.add(sr)
 
     await db.commit()
 
@@ -233,6 +265,8 @@ async def create_bulk_scan(
         "total_issues": scan_result["total_issues"],
         "cross_release_issues": scan_result["cross_release_issues"],
         "per_release_issues": scan_result["per_release_issues"],
+        "identifier_coverage": scan_result["identifier_coverage"],
+        "enrichment_status": scan_result["enrichment_status"],
         "completed_at": now.isoformat(),
     })
 

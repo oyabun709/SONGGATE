@@ -807,6 +807,8 @@ def _run_bulk_scan(content: bytes, filename: str = "") -> dict[str, Any]:
         "total_issues": result["total_issues"],
         "cross_release_issues": result["cross_release_issues"],
         "per_release_issues": result["per_release_issues"],
+        "identifier_coverage": result["identifier_coverage"],
+        "enrichment_status": result["enrichment_status"],
         "completed_at": now,
     }
 
