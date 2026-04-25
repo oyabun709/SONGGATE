@@ -16,6 +16,7 @@ import {
   Building2,
   ShieldAlert,
   X,
+  Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/releases",   label: "Releases",   icon: Package },
   { href: "/pipelines",  label: "Pipelines",  icon: GitBranch },
   { href: "/rules",      label: "Rules",      icon: ShieldCheck },
+  { href: "/catalog",    label: "Catalog",    icon: Database,   badge: "Index" },
   { href: "/analytics",  label: "Analytics",  icon: TrendingUp, badge: "Corpus" },
   { href: "/reports",    label: "Reports",    icon: BarChart3 },
   { href: "/billing",    label: "Billing",    icon: CreditCard },

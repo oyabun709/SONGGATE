@@ -122,6 +122,7 @@ async def create_scan(
 @router.post("/scans/bulk", status_code=status.HTTP_200_OK)
 async def create_bulk_scan(
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
     org: Organization = Depends(get_current_org),
 ) -> JSONResponse:
@@ -160,9 +161,20 @@ async def create_bulk_scan(
     # Enforce scan quota
     await check_scan_limit(org)
 
-    # Parse → validate → score
-    releases    = parse_bulk_file(content)
-    issues      = validate_bulk_file(releases, today=date.today())
+    from services.bulk.catalog_indexer import check_cross_catalog_conflicts
+
+    # Parse → per-file validation
+    releases = parse_bulk_file(content)
+    issues   = validate_bulk_file(releases, today=date.today())
+
+    # Cross-catalog conflict check against historical data
+    cross_catalog_issues = await check_cross_catalog_conflicts(
+        db=db, releases=releases, org_id=org.id
+    )
+    if cross_catalog_issues:
+        issues = issues + cross_catalog_issues
+
+    # Score with all issues (per-file + cross-catalog)
     scan_result = score_bulk_scan(releases, issues)
 
     now = datetime.now(timezone.utc)
@@ -250,6 +262,14 @@ async def create_bulk_scan(
 
     await db.commit()
 
+    # Background: index parsed releases into catalog_index corpus
+    background_tasks.add_task(
+        _index_bulk_releases_background,
+        scan_id=str(db_scan.id),
+        releases=releases,
+        org_id=str(org.id),
+    )
+
     return JSONResponse(content={
         "scan_id": str(db_scan.id),
         "release_id": str(db_release.id),
@@ -269,6 +289,31 @@ async def create_bulk_scan(
         "enrichment_status": scan_result["enrichment_status"],
         "completed_at": now.isoformat(),
     })
+
+
+async def _index_bulk_releases_background(
+    scan_id: str,
+    releases: list,
+    org_id: str,
+) -> None:
+    """Background task: write bulk scan releases into the catalog_index corpus."""
+    from database import AsyncSessionLocal
+    from services.bulk.catalog_indexer import index_scan_releases
+    import logging
+
+    try:
+        async with AsyncSessionLocal() as db:
+            await index_scan_releases(
+                db=db,
+                scan_id=uuid.UUID(scan_id),
+                releases=releases,
+                org_id=uuid.UUID(org_id),
+                is_demo=False,
+            )
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "Catalog indexing failed for scan %s", scan_id
+        )
 
 
 async def _run_scan_background(

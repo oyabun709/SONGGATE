@@ -4,7 +4,7 @@ from fastapi.openapi.utils import get_openapi
 
 from config import settings
 from routers import releases, pipelines, rules, reports, health, webhooks, uploads, scans
-from routers import public_api, billing, admin, demo
+from routers import public_api, billing, admin, demo, catalog
 
 app = FastAPI(
     title="RopQA API",
@@ -67,6 +67,9 @@ app.include_router(rules.router, prefix="/rules", tags=["rules"])
 app.include_router(reports.router, prefix="/reports", tags=["reports"])
 app.include_router(uploads.router, prefix="/uploads", tags=["uploads"])
 app.include_router(scans.router, tags=["scans"])
+
+# ── Catalog explorer (Clerk JWT) ─────────────────────────────────────────────
+app.include_router(catalog.router, tags=["catalog"])
 
 # ── Billing (Clerk JWT) ───────────────────────────────────────────────────────
 app.include_router(billing.router, tags=["billing"])
