@@ -43,7 +43,7 @@ import uuid
 from datetime import date, datetime, timezone, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,6 +88,7 @@ def _key_prefix(plaintext: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def _get_api_key_org(
+    request: Request,
     authorization: Annotated[
         str,
         Header(
@@ -140,6 +141,12 @@ async def _get_api_key_org(
     org = org_result.scalar_one_or_none()
     if org is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Organization not found")
+
+    # Expose org context to middleware (rate limiter + usage recorder)
+    request.state.org_id     = str(org.id)
+    request.state.org_tier   = org.tier
+    request.state.api_key_id = str(api_key.id)
+
     return org
 
 
@@ -2271,6 +2278,119 @@ async def _compute_dsp_matrix(
         )
         for r in rate_rows
     ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Usage endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/usage/summary",
+    summary="API usage summary",
+    description=(
+        "Return aggregate API call counts and error rates for the last 30 days. "
+        "Grouped by endpoint and HTTP method."
+    ),
+)
+async def get_usage_summary(
+    org: OrgDep,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    window_start = datetime.now(timezone.utc) - timedelta(days=30)
+
+    rows = await db.execute(
+        text("""
+            SELECT
+                endpoint,
+                method,
+                COUNT(*)                                                    AS total_calls,
+                COUNT(*) FILTER (WHERE status_code >= 400)                 AS error_calls,
+                ROUND(AVG(latency_ms)::numeric, 1)                        AS avg_latency_ms,
+                MIN(created_at)                                            AS first_call,
+                MAX(created_at)                                            AS last_call
+            FROM api_usage_events
+            WHERE org_id = :org_id
+              AND created_at >= :since
+            GROUP BY endpoint, method
+            ORDER BY total_calls DESC
+        """),
+        {"org_id": str(org.id), "since": window_start.isoformat()},
+    )
+
+    totals = await db.execute(
+        text("""
+            SELECT
+                COUNT(*)                                                    AS total_calls,
+                COUNT(*) FILTER (WHERE status_code >= 400)                 AS total_errors,
+                COUNT(*) FILTER (WHERE status_code = 429)                  AS rate_limited
+            FROM api_usage_events
+            WHERE org_id = :org_id
+              AND created_at >= :since
+        """),
+        {"org_id": str(org.id), "since": window_start.isoformat()},
+    )
+    t = dict(totals.mappings().one())
+
+    return {
+        "period_days": 30,
+        "total_calls":   int(t["total_calls"]   or 0),
+        "total_errors":  int(t["total_errors"]  or 0),
+        "rate_limited":  int(t["rate_limited"]  or 0),
+        "by_endpoint": [
+            {
+                "endpoint":       r["endpoint"],
+                "method":         r["method"],
+                "total_calls":    int(r["total_calls"]),
+                "error_calls":    int(r["error_calls"]),
+                "avg_latency_ms": float(r["avg_latency_ms"] or 0),
+                "first_call":     r["first_call"].isoformat() if r["first_call"] else None,
+                "last_call":      r["last_call"].isoformat()  if r["last_call"]  else None,
+            }
+            for r in rows.mappings().all()
+        ],
+    }
+
+
+@router.get(
+    "/usage/history",
+    summary="Daily API usage history",
+    description="Return daily call counts for the last N days (default 30).",
+)
+async def get_usage_history(
+    org: OrgDep,
+    days: int = Query(30, ge=1, le=90, description="Number of days to return"),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    window_start = datetime.now(timezone.utc) - timedelta(days=days)
+
+    rows = await db.execute(
+        text("""
+            SELECT
+                DATE_TRUNC('day', created_at AT TIME ZONE 'UTC')::date  AS day,
+                COUNT(*)                                                  AS total_calls,
+                COUNT(*) FILTER (WHERE status_code >= 400)               AS error_calls,
+                COUNT(*) FILTER (WHERE status_code = 429)                AS rate_limited
+            FROM api_usage_events
+            WHERE org_id = :org_id
+              AND created_at >= :since
+            GROUP BY 1
+            ORDER BY 1 ASC
+        """),
+        {"org_id": str(org.id), "since": window_start.isoformat()},
+    )
+
+    return {
+        "period_days": days,
+        "history": [
+            {
+                "date":        str(r["day"]),
+                "total_calls": int(r["total_calls"]),
+                "error_calls": int(r["error_calls"]),
+                "rate_limited": int(r["rate_limited"]),
+            }
+            for r in rows.mappings().all()
+        ],
+    }
 
 
 def _sanitize_overview(overview: AnalyticsOverview) -> dict[str, Any]:

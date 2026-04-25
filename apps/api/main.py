@@ -4,7 +4,8 @@ from fastapi.openapi.utils import get_openapi
 
 from config import settings
 from routers import releases, pipelines, rules, reports, health, webhooks, uploads, scans
-from routers import public_api, billing, admin, demo, catalog
+from routers import public_api, billing, admin, demo, catalog, webhook_settings
+from middleware.rate_limit import APIKeyRateLimitMiddleware
 
 app = FastAPI(
     title="RopQA API",
@@ -52,8 +53,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
+    expose_headers=["Content-Disposition", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
+
+app.add_middleware(APIKeyRateLimitMiddleware)
 
 # ── Health / webhooks / demo (no auth) ───────────────────────────────────────
 app.include_router(health.router, tags=["health"])
@@ -73,6 +76,9 @@ app.include_router(catalog.router, tags=["catalog"])
 
 # ── Billing (Clerk JWT) ───────────────────────────────────────────────────────
 app.include_router(billing.router, tags=["billing"])
+
+# ── Webhook settings (Clerk JWT) ──────────────────────────────────────────────
+app.include_router(webhook_settings.router, tags=["webhook-settings"])
 
 # ── Admin (Clerk JWT + admin user check) ──────────────────────────────────────
 app.include_router(admin.router, tags=["admin"])

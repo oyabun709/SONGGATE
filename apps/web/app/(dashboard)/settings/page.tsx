@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { Key, Plus, Trash2, Copy, Check, Loader2, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { Key, Plus, Trash2, Copy, Check, Loader2, AlertTriangle, Webhook } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -295,6 +296,27 @@ export default function SettingsPage() {
               </div>
             ))
           )}
+        </div>
+      </div>
+
+      {/* Webhooks quick link */}
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50">
+              <Webhook className="h-5 w-5 text-indigo-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Outgoing Webhooks</p>
+              <p className="text-xs text-slate-500">Register endpoints to receive real-time scan events.</p>
+            </div>
+          </div>
+          <Link
+            href="/settings/webhooks"
+            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Manage →
+          </Link>
         </div>
       </div>
     </div>
