@@ -291,6 +291,159 @@ async def create_bulk_scan(
     })
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# POST /scans/isrc — ISRC reference file scan (authenticated, stored in DB)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/scans/isrc", status_code=status.HTTP_200_OK)
+async def create_isrc_scan(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+) -> JSONResponse:
+    """
+    Scan a Luminate ISRC reference file (pipe-delimited or CSV).
+
+    Accepts .txt, .csv files up to 5 MB.
+    Runs parser → validator → scorer entirely in-process.
+
+    Column format:
+      ISRC | Artist | Title | ReleaseDate
+      [LabelAbbreviation] [LabelName] [CountryCode]
+
+    Returns full scan result immediately (synchronous — no polling needed).
+    """
+    from datetime import date
+    from services.bulk.isrc_parser import parse_isrc_file
+    from services.bulk.isrc_validator import validate_isrc_file
+    from services.bulk.bulk_scorer import score_bulk_scan
+    from models.release import Release, SubmissionFormat, ReleaseStatus
+    from models.scan import Scan, ScanStatus, ScanGrade
+    from models.scan_result import ScanResult, ResultStatus
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large (max 5 MB).")
+
+    filename = file.filename or "isrc_registration.txt"
+    await check_scan_limit(org)
+
+    records = parse_isrc_file(content)
+    if not records:
+        raise HTTPException(status_code=422, detail="No valid ISRC records found in file.")
+
+    issues = validate_isrc_file(records, today=date.today())
+
+    # Re-use bulk scorer — same formula, same grade thresholds
+    # Adapt ParsedISRC into the shape the scorer expects
+    from services.bulk.bulk_parser import ParsedRelease
+    pseudo_releases = [
+        ParsedRelease(
+            ean=r.isrc,
+            artist=r.artist,
+            title=r.title,
+            release_date_raw=r.release_date_raw,
+            release_date_parsed=r.release_date_parsed,
+            imprint=r.label_name,
+            label=r.label_name,
+            narm_config="",
+            row_number=r.row_number,
+        )
+        for r in records
+    ]
+    scan_result = score_bulk_scan(pseudo_releases, issues)
+
+    now = datetime.now(timezone.utc)
+    first = records[0] if records else None
+    release_title  = filename.removesuffix(".txt").removesuffix(".csv")
+    release_artist = first.artist if first else "Various Artists"
+
+    db_release = Release(
+        id=uuid.uuid4(),
+        org_id=org.id,
+        title=f"ISRC: {release_title}",
+        artist=release_artist,
+        upc=None,
+        submission_format=SubmissionFormat.BULK_REGISTRATION,
+        status=ReleaseStatus.complete,
+        metadata_={
+            "isrc_registration": True,
+            "total_records": len(records),
+            "filename": filename,
+        },
+        created_at=now,
+    )
+    db.add(db_release)
+    await db.flush()
+
+    grade_enum = ScanGrade(scan_result["grade"])
+    db_scan = Scan(
+        id=uuid.uuid4(),
+        release_id=db_release.id,
+        org_id=org.id,
+        status=ScanStatus.complete,
+        readiness_score=scan_result["score"],
+        grade=grade_enum,
+        total_issues=scan_result["total_issues"],
+        critical_count=scan_result["critical_count"],
+        warning_count=scan_result["warning_count"],
+        info_count=scan_result["info_count"],
+        layers_run=["isrc_registration"],
+        started_at=now,
+        completed_at=now,
+        created_at=now,
+    )
+    db_scan.validated_fields = {
+        "isrc_registration": True,
+        "total_records": len(records),
+        "identifier_coverage": scan_result["identifier_coverage"],
+    }
+    db.add(db_scan)
+    await db.flush()
+
+    for issue in issues:
+        sr_status = ResultStatus.fail if issue.severity == "critical" else ResultStatus.warn
+        sr = ScanResult(
+            id=uuid.uuid4(),
+            scan_id=db_scan.id,
+            layer="isrc_registration",
+            rule_id=issue.rule_id,
+            severity=issue.severity,
+            status=sr_status,
+            message=issue.message,
+            fix_hint=issue.fix_hint,
+            metadata_={
+                "scope": issue.scope,
+                "row_number": issue.row_number,
+                "affected_ean": issue.affected_ean,
+                "affected_rows": issue.affected_rows,
+            },
+            created_at=now,
+        )
+        db.add(sr)
+
+    await db.commit()
+
+    return JSONResponse(content={
+        "scan_id":       str(db_scan.id),
+        "release_id":    str(db_release.id),
+        "format":        "isrc_registration",
+        "status":        "complete",
+        "readiness_score": scan_result["score"],
+        "grade":         scan_result["grade"],
+        "total_records": len(records),
+        "releases_with_issues": scan_result["releases_with_issues"],
+        "critical_count":  scan_result["critical_count"],
+        "warning_count":   scan_result["warning_count"],
+        "info_count":      scan_result["info_count"],
+        "total_issues":    scan_result["total_issues"],
+        "cross_release_issues": scan_result["cross_release_issues"],
+        "per_release_issues":   scan_result["per_release_issues"],
+        "identifier_coverage":  scan_result["identifier_coverage"],
+        "completed_at": now.isoformat(),
+    })
+
+
 async def _index_bulk_releases_background(
     scan_id: str,
     releases: list,

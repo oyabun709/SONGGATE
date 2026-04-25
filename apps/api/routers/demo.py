@@ -39,6 +39,8 @@ from services.metadata.rules_engine import DSPRulesEngine, ReleaseMetadata
 from services.bulk.bulk_parser import parse_bulk_file, extract_text_from_pdf
 from services.bulk.bulk_validator import validate_bulk_file
 from services.bulk.bulk_scorer import score_bulk_scan
+from services.bulk.isrc_parser import parse_isrc_file
+from services.bulk.isrc_validator import validate_isrc_file
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +95,7 @@ def _client_ip(request: Request) -> str:
 
 _SAMPLE_XML_PATH  = Path(__file__).parent.parent / "docs" / "ddex" / "demo-release-with-errors.xml"
 _SAMPLE_BULK_PATH = Path(__file__).parent.parent / "data" / "sample_bulk_registration.txt"
+_SAMPLE_ISRC_PATH = Path(__file__).parent.parent / "data" / "sample_isrc_registration.txt"
 
 def _load_sample_xml() -> bytes:
     if _SAMPLE_XML_PATH.exists():
@@ -851,6 +854,135 @@ async def demo_bulk_scan(
         ip_hash,
         result.get("grade", "?"),
         result.get("total_releases", 0),
+        result.get("total_issues", 0),
+    )
+
+    return JSONResponse(content=result)
+
+
+def _run_isrc_scan(content: bytes, filename: str = "") -> dict[str, Any]:
+    """
+    Run the ISRC reference file scan pipeline entirely in memory.
+    No database access, no file storage.
+    Returns a dict suitable for the demo ISRC scan response.
+    """
+    from datetime import date
+
+    scan_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    records = parse_isrc_file(content)
+    issues  = validate_isrc_file(records, today=date.today())
+
+    total   = len(records)
+    critical = sum(1 for i in issues if i.severity == "critical")
+    warning  = sum(1 for i in issues if i.severity == "warning")
+    info     = sum(1 for i in issues if i.severity == "info")
+    total_issues = len(issues)
+
+    # Simple readiness score: start at 100, deduct per issue
+    score = max(0, 100 - critical * 15 - warning * 5 - info * 1)
+    if score >= 90:
+        grade = "A"
+    elif score >= 75:
+        grade = "B"
+    elif score >= 60:
+        grade = "C"
+    elif score >= 40:
+        grade = "D"
+    else:
+        grade = "F"
+
+    def _fmt(i: Any) -> dict[str, Any]:
+        return {
+            "id": i.id,
+            "severity": i.severity,
+            "rule_id": i.rule_id,
+            "rule_name": i.rule_name,
+            "message": i.message,
+            "fix_hint": i.fix_hint,
+            "row_number": i.row_number,
+            "affected_rows": i.affected_rows,
+        }
+
+    cross_record = [_fmt(i) for i in issues if i.scope == "cross_release"]
+
+    # Group per-record issues by row
+    from collections import defaultdict as _dd
+    per_row: dict[int, list[Any]] = _dd(list)
+    for iss in issues:
+        if iss.scope == "per_release" and iss.row_number is not None:
+            per_row[iss.row_number].append(iss)
+
+    records_by_row = {r.row_number: r for r in records}
+    per_record = []
+    for row_num in sorted(per_row.keys()):
+        rec = records_by_row.get(row_num)
+        per_record.append({
+            "row_number": row_num,
+            "isrc":   rec.isrc   if rec else "",
+            "artist": rec.artist if rec else "",
+            "title":  rec.title  if rec else "",
+            "issues": [_fmt(i) for i in per_row[row_num]],
+        })
+
+    return {
+        "scan_id": scan_id,
+        "demo": True,
+        "format": "isrc_registration",
+        "watermark": "SONGGATE Demo — songgate.io",
+        "status": "complete",
+        "readiness_score": score,
+        "grade": grade,
+        "total_records": total,
+        "critical_count": critical,
+        "warning_count": warning,
+        "info_count": info,
+        "total_issues": total_issues,
+        "cross_record_issues": cross_record,
+        "per_record_issues":  per_record,
+        "completed_at": now,
+    }
+
+
+@router.post("/isrc")
+async def demo_isrc_scan(
+    request: Request,
+    file: UploadFile | None = File(default=None),
+) -> JSONResponse:
+    """
+    Run a demo ISRC reference file scan.
+
+    Send a multipart/form-data request with field ``file`` containing a
+    pipe-delimited ISRC reference file.
+    Omit the field to use the embedded sample file.
+
+    Returns ISRC scan results including per-record and cross-record issues.
+    Rate limited same as /api/demo/scan.
+    """
+    ip = _client_ip(request)
+    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:8]
+    _check_rate_limit(ip)
+
+    if file is not None:
+        content = await file.read()
+        if len(content) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File too large (max 5 MB).")
+        filename = file.filename or ""
+    else:
+        if _SAMPLE_ISRC_PATH.exists():
+            content = _SAMPLE_ISRC_PATH.read_bytes()
+        else:
+            content = b"ISRC|Artist|Title|ReleaseDate\n"
+        filename = "sample_isrc_registration.txt"
+
+    result = _run_isrc_scan(content, filename=filename)
+
+    logger.info(
+        "demo_isrc ip_hash=%s grade=%s records=%d issues=%d",
+        ip_hash,
+        result.get("grade", "?"),
+        result.get("total_records", 0),
         result.get("total_issues", 0),
     )
 

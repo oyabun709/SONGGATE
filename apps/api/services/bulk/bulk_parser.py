@@ -6,7 +6,7 @@ and major distributors for catalog registration.
 
 Expected columns (pipe-delimited or CSV, minimum 7):
   EAN | Artist | Title | Release Date | Imprint | Label | NARM Config
-  [ISNI] [ISWC]   ← optional columns 8 and 9
+  [LabelAbbreviation] [CountryCode] [ISNI] [ISWC]  ← optional cols 8–11
 
 Returns a list of ParsedRelease objects for downstream validation.
 """
@@ -34,6 +34,8 @@ class ParsedRelease:
     row_number: int                 # 1-indexed, not counting header
     isni: str | None = None         # International Standard Name Identifier
     iswc: str | None = None         # International Standard Musical Work Code
+    label_abbreviation: str | None = None  # Short label code (1–10 chars)
+    country_code: str | None = None        # ISO 3166-1 alpha-2 (e.g. US, GB)
 
 
 # ── Header detection ─────────────────────────────────────────────────────────
@@ -76,15 +78,39 @@ def _parse_mmddyy(raw: str) -> date | None:
 
 # ── Row normaliser ────────────────────────────────────────────────────────────
 
-_MIN_COLUMNS = 7   # EAN|Artist|Title|Date|Imprint|Label|NARM
-_MAX_COLUMNS = 9   # + ISNI + ISWC
+_MIN_COLUMNS = 7    # EAN|Artist|Title|Date|Imprint|Label|NARM
+_MAX_COLUMNS = 11   # + LabelAbbreviation + CountryCode + ISNI + ISWC
+
+
+def _get(fields: list[str], idx: int) -> str | None:
+    """Return stripped field at index, or None if missing/empty."""
+    if idx < len(fields):
+        v = fields[idx].strip()
+        return v or None
+    return None
 
 
 def _normalise_row(fields: list[str], row_number: int) -> ParsedRelease | None:
     """
     Convert a list of raw string fields into a ParsedRelease.
     Returns None for rows that are entirely empty (skip silently).
-    Columns 8 (ISNI) and 9 (ISWC) are optional.
+
+    Column layout (minimum 7, maximum 11):
+      0  EAN
+      1  Artist
+      2  Title
+      3  Release Date (MMDDYY)
+      4  Imprint
+      5  Label
+      6  NARM Config
+      7  LabelAbbreviation  (optional)
+      8  CountryCode        (optional, ISO 3166-1 alpha-2)
+      9  ISNI               (optional)
+      10 ISWC               (optional)
+
+    Legacy 9-column files (no LabelAbbreviation/CountryCode) are also
+    supported: if column 7 looks like an ISNI (16 digits) or ISWC (starts
+    with T), it is treated as such.
     """
     # Pad to minimum expected length so we don't IndexError on short rows
     while len(fields) < _MIN_COLUMNS:
@@ -102,9 +128,28 @@ def _normalise_row(fields: list[str], row_number: int) -> ParsedRelease | None:
     label       = fields[5].strip() or None
     narm_config = fields[6].strip()
 
-    # Optional identifier columns
-    isni = fields[7].strip() or None if len(fields) > 7 else None
-    iswc = fields[8].strip() or None if len(fields) > 8 else None
+    # Detect whether col 7 is LabelAbbreviation or legacy ISNI/ISWC
+    col7 = (fields[7].strip() if len(fields) > 7 else "")
+    col8 = (fields[8].strip() if len(fields) > 8 else "")
+
+    # Legacy 9-column detection: col7 is ISNI (16 digits after stripping dashes)
+    # or ISWC (starts with T followed by digits).
+    _col7_clean = col7.replace("-", "").replace(" ", "")
+    _is_legacy_isni = _col7_clean.isdigit() and len(_col7_clean) == 16
+    _is_legacy_iswc = bool(col7 and col7.upper().startswith("T") and col7[1:].replace("-", "").isdigit())
+
+    if _is_legacy_isni or _is_legacy_iswc:
+        # Legacy 9-col layout: col7=ISNI, col8=ISWC (no label_abbr/country)
+        label_abbreviation = None
+        country_code       = None
+        isni = col7 or None
+        iswc = col8 or None
+    else:
+        # Extended 11-col layout
+        label_abbreviation = col7 or None
+        country_code       = col8 or None
+        isni = _get(fields, 9)
+        iswc = _get(fields, 10)
 
     return ParsedRelease(
         ean=ean,
@@ -118,6 +163,8 @@ def _normalise_row(fields: list[str], row_number: int) -> ParsedRelease | None:
         row_number=row_number,
         isni=isni,
         iswc=iswc,
+        label_abbreviation=label_abbreviation,
+        country_code=country_code,
     )
 
 

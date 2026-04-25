@@ -119,6 +119,38 @@ interface BulkDemoScan {
   completed_at: string;
 }
 
+interface ISRCPerRecordEntry {
+  row_number: number;
+  isrc: string;
+  artist: string;
+  title: string;
+  issues: Array<{
+    id: string;
+    severity: string;
+    rule_name: string;
+    message: string;
+    fix_hint: string;
+  }>;
+}
+
+interface ISRCDemoScan {
+  scan_id: string;
+  demo: boolean;
+  format: "isrc_registration";
+  watermark: string;
+  status: string;
+  readiness_score: number;
+  grade: string;
+  total_records: number;
+  critical_count: number;
+  warning_count: number;
+  info_count: number;
+  total_issues: number;
+  cross_record_issues: BulkIssue[];
+  per_record_issues: ISRCPerRecordEntry[];
+  completed_at: string;
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const FORMAT_STEP_LABEL: Record<string, string> = {
@@ -126,6 +158,7 @@ const FORMAT_STEP_LABEL: Record<string, string> = {
   json: "JSON Validation",
   xml:  "DDEX Validation",
   bulk: "EAN Format Validation",
+  isrc: "ISRC Format Validation",
 };
 
 const FORMAT_LAYER_LABEL: Record<string, string> = {
@@ -133,14 +166,22 @@ const FORMAT_LAYER_LABEL: Record<string, string> = {
   json: "JSON / Format",
   xml:  "DDEX / Format",
   bulk: "EAN Validation",
+  isrc: "ISRC Validation",
 };
 
 function getLayerSteps(fmt: string) {
   if (fmt === "bulk") {
     return [
-      { key: "ean",         label: "EAN Validation",       duration: 700 },
+      { key: "ean",         label: "EAN Validation",        duration: 700 },
       { key: "cross",       label: "Cross-Release Analysis", duration: 900 },
-      { key: "coverage",    label: "Identifier Coverage",   duration: 800 },
+      { key: "coverage",    label: "Identifier Coverage",    duration: 800 },
+    ];
+  }
+  if (fmt === "isrc") {
+    return [
+      { key: "isrc",   label: "ISRC Format Validation",  duration: 700 },
+      { key: "cross",  label: "Duplicate Detection",      duration: 800 },
+      { key: "artist", label: "Artist Consistency Check", duration: 700 },
     ];
   }
   return [
@@ -581,7 +622,7 @@ function LayerMiniBar({ label, score }: { label: string; score: number }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-type Phase = "terms" | "hero" | "scanning" | "results" | "bulk_results";
+type Phase = "terms" | "hero" | "scanning" | "results" | "bulk_results" | "isrc_results";
 
 export default function DemoPage() {
   const [phase, setPhase]         = useState<Phase>("terms");
@@ -589,6 +630,7 @@ export default function DemoPage() {
   const [completedLayers, setCompleted] = useState<Set<string>>(new Set());
   const [scanResult, setScanResult]     = useState<DemoScan | null>(null);
   const [bulkResult, setBulkResult]     = useState<BulkDemoScan | null>(null);
+  const [isrcResult, setIsrcResult]     = useState<ISRCDemoScan | null>(null);
   const [scanError, setScanError]       = useState<string | null>(null);
   const [scanFormat, setScanFormat]     = useState<string>("xml");
   const [devtoolsNotice, setDevtoolsNotice] = useState(false);
@@ -629,6 +671,7 @@ export default function DemoPage() {
     setCompleted(new Set());
     setScanResult(null);
     setBulkResult(null);
+    setIsrcResult(null);
     setScanFormat(fmt);
     setPhase("scanning");
 
@@ -661,6 +704,9 @@ export default function DemoPage() {
       if (fmt === "bulk") {
         setBulkResult(result as BulkDemoScan);
         setPhase("bulk_results");
+      } else if (fmt === "isrc") {
+        setIsrcResult(result as ISRCDemoScan);
+        setPhase("isrc_results");
       } else {
         setScanResult(result as DemoScan);
         setPhase("results");
@@ -703,6 +749,23 @@ export default function DemoPage() {
         return res.json() as Promise<BulkDemoScan>;
       });
     await animateLayers(promise, "bulk");
+  }
+
+  // ── Scan sample ISRC reference file ──────────────────────────────────────
+
+  async function scanISRC() {
+    setScanError(null);
+    const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+    const promise = fetch(`${API}/api/demo/isrc`, { method: "POST" })
+      .then(async res => {
+        if (res.status === 429) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.detail?.message ?? "Rate limit reached.");
+        }
+        if (!res.ok) throw new Error("Scan failed. Please try again.");
+        return res.json() as Promise<ISRCDemoScan>;
+      });
+    await animateLayers(promise, "isrc");
   }
 
   // ── Scan with uploaded file ───────────────────────────────────────────────
@@ -981,11 +1044,19 @@ export default function DemoPage() {
                 <Zap className="h-4 w-4" />
                 Scan a bulk catalog file
               </button>
+
+              <button
+                onClick={scanISRC}
+                className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <Zap className="h-4 w-4 text-slate-500" />
+                Scan an ISRC reference file
+              </button>
             </div>
           )}
 
           <p className="mt-4 text-xs text-slate-400">
-            Work with four supported formats: DDEX XML, Bulk Registration (EAN), CSV, and JSON. Your files are not stored.
+            Supported formats: DDEX XML, Bulk Registration (EAN), ISRC Reference, CSV, and JSON. Your files are not stored.
           </p>
 
           {/* Scanning animation */}
@@ -994,6 +1065,8 @@ export default function DemoPage() {
               <p className="mb-6 text-sm font-semibold text-slate-700">
                 {scanFormat === "bulk"
                   ? "Running your catalog through 3 QA layers…"
+                  : scanFormat === "isrc"
+                  ? "Running your ISRC file through 3 validation checks…"
                   : "Running your release through 4 QA layers…"}
               </p>
               <ScanProgress completedLayers={completedLayers} fmt={scanFormat} />
@@ -1305,6 +1378,218 @@ export default function DemoPage() {
               </h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-slate-500">
                 Catch EAN errors, duplicates, and missing metadata before they reach Luminate.
+              </p>
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Link
+                  href="/sign-up"
+                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                >
+                  Start free trial <ArrowRight className="h-4 w-4" />
+                </Link>
+                <a
+                  href="mailto:andrew@housesonhills.io?subject=SONGGATE Pilot&body=Hi, I'd like to book a call to discuss a SONGGATE pilot."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Book a pilot call
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ISRC RESULTS ─────────────────────────────────────────────────── */}
+      {phase === "isrc_results" && isrcResult && (
+        <div data-demo-results>
+          <div className="border-b border-dashed border-indigo-200 bg-indigo-50 py-2 text-center text-xs font-semibold text-indigo-600 tracking-wide">
+            SONGGATE Confidential Demo — ISRC Reference File Scan · songgate.io
+          </div>
+
+          <div className="mx-auto max-w-4xl space-y-8 px-6 py-10">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h1 className="text-2xl font-semibold text-slate-900">
+                  ISRC Reference File Scan
+                  <span className="ml-2 text-lg font-normal text-slate-500">
+                    — {isrcResult.total_records} records
+                  </span>
+                </h1>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Demo scan · Results not stored · Luminate Market Share ISRC format
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setPhase("hero"); setIsrcResult(null); }}
+                  className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  ← New scan
+                </button>
+              </div>
+            </div>
+
+            {/* Score + stats */}
+            <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="flex flex-col items-center gap-10 md:flex-row md:items-start">
+                <div className="shrink-0 flex flex-col items-center gap-4">
+                  <ScoreCircle
+                    score={isrcResult.readiness_score}
+                    grade={
+                      isrcResult.readiness_score >= 90 ? "PASS"
+                      : isrcResult.readiness_score >= 60 ? "WARN"
+                      : "FAIL"
+                    }
+                  />
+                  <div className="flex items-center gap-4 text-center">
+                    <div>
+                      <p className="text-2xl font-bold text-red-600 tabular-nums">{isrcResult.critical_count}</p>
+                      <p className="text-xs text-slate-400">Critical</p>
+                    </div>
+                    <div className="h-8 w-px bg-slate-100" />
+                    <div>
+                      <p className="text-2xl font-bold text-amber-500 tabular-nums">{isrcResult.warning_count}</p>
+                      <p className="text-xs text-slate-400">Warnings</p>
+                    </div>
+                    <div className="h-8 w-px bg-slate-100" />
+                    <div>
+                      <p className="text-2xl font-bold text-slate-400 tabular-nums">{isrcResult.info_count}</p>
+                      <p className="text-xs text-slate-400">Info</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 w-full space-y-5">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-800">File Summary</h2>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      Scanned {isrcResult.total_records} ISRC records from the reference file.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                      <p className="text-2xl font-bold text-slate-800 tabular-nums">{isrcResult.total_records}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Records scanned</p>
+                    </div>
+                    <div className={cn(
+                      "rounded-lg border px-4 py-3",
+                      isrcResult.total_issues > 0
+                        ? "border-red-100 bg-red-50"
+                        : "border-emerald-100 bg-emerald-50",
+                    )}>
+                      <p className={cn(
+                        "text-2xl font-bold tabular-nums",
+                        isrcResult.total_issues > 0 ? "text-red-600" : "text-emerald-600",
+                      )}>
+                        {isrcResult.total_issues}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">Total issues</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Cross-record issues */}
+            {isrcResult.cross_record_issues.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                    Cross-Record Issues
+                    {isrcResult.cross_record_issues.filter(i => i.severity === "critical").length > 0 && (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                        {isrcResult.cross_record_issues.filter(i => i.severity === "critical").length} critical
+                      </span>
+                    )}
+                  </h2>
+                  <span className="text-xs text-slate-400">Duplicates, inconsistencies across the file</span>
+                </div>
+                <div className="space-y-2">
+                  {isrcResult.cross_record_issues
+                    .sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9))
+                    .map(issue => (
+                    <BulkCrossIssueCard key={issue.id} issue={issue} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Per-record issues */}
+            {isrcResult.per_record_issues.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                    Per-Record Issues
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                      {isrcResult.per_record_issues.length} records affected
+                    </span>
+                  </h2>
+                  <span className="text-xs text-slate-400">Issues on individual rows</span>
+                </div>
+                <div className="space-y-2">
+                  {isrcResult.per_record_issues.map(entry => (
+                    <div key={entry.row_number} className="rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-sm">
+                      <div className="flex items-start gap-3 p-4">
+                        <div className="mt-0.5 shrink-0">
+                          {entry.issues.some(i => i.severity === "critical")
+                            ? <AlertTriangle className="h-4 w-4 text-red-500" />
+                            : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-800">
+                            Row {entry.row_number}
+                            {entry.title && <span className="ml-2 font-normal text-slate-600">— {entry.title}</span>}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            {entry.artist}
+                            {entry.isrc && <span className="ml-2 font-mono">{entry.isrc}</span>}
+                          </p>
+                          <div className="mt-3 space-y-2">
+                            {entry.issues.map(issue => (
+                              <div key={issue.id} className="rounded-md border border-slate-100 bg-slate-50 p-3">
+                                <div className="flex items-start gap-2">
+                                  <SeverityBadge severity={issue.severity} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-slate-500">{issue.rule_name}</p>
+                                    <p className="text-sm text-slate-800 mt-0.5">{issue.message}</p>
+                                    {issue.fix_hint && (
+                                      <p className="mt-1.5 text-xs text-indigo-700 bg-indigo-50 rounded px-2 py-1">
+                                        ↳ {issue.fix_hint}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All clear */}
+            {isrcResult.total_issues === 0 && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-8 text-center">
+                <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-3" />
+                <h2 className="text-base font-semibold text-emerald-800">All ISRC records validated</h2>
+                <p className="text-xs text-emerald-600 mt-1">
+                  Every ISRC format, artist name, title, and date validated successfully.
+                </p>
+              </div>
+            )}
+
+            {/* CTA */}
+            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-indigo-100/50 px-8 py-10 text-center">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+                Ready to pre-flight your catalog?
+              </h2>
+              <p className="mx-auto mt-3 max-w-md text-sm text-slate-500">
+                Catch ISRC errors, duplicates, and missing metadata before Luminate submission.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link

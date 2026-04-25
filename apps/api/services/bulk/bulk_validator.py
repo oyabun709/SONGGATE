@@ -32,6 +32,28 @@ from datetime import date, timedelta
 
 from services.bulk.bulk_parser import ParsedRelease
 
+# ── ISO 3166-1 alpha-2 country codes ─────────────────────────────────────────
+# Complete set of valid 2-letter codes per ISO 3166-1
+_ISO_COUNTRY_CODES: frozenset[str] = frozenset({
+    "AF","AX","AL","DZ","AS","AD","AO","AI","AQ","AG","AR","AM","AW","AU","AT",
+    "AZ","BS","BH","BD","BB","BY","BE","BZ","BJ","BM","BT","BO","BQ","BA","BW",
+    "BV","BR","IO","BN","BG","BF","BI","CV","KH","CM","CA","KY","CF","TD","CL",
+    "CN","CX","CC","CO","KM","CG","CD","CK","CR","CI","HR","CU","CW","CY","CZ",
+    "DK","DJ","DM","DO","EC","EG","SV","GQ","ER","EE","SZ","ET","FK","FO","FJ",
+    "FI","FR","GF","PF","TF","GA","GM","GE","DE","GH","GI","GR","GL","GD","GP",
+    "GU","GT","GG","GN","GW","GY","HT","HM","VA","HN","HK","HU","IS","IN","ID",
+    "IR","IQ","IE","IM","IL","IT","JM","JP","JE","JO","KZ","KE","KI","KP","KR",
+    "KW","KG","LA","LV","LB","LS","LR","LY","LI","LT","LU","MO","MG","MW","MY",
+    "MV","ML","MT","MH","MQ","MR","MU","YT","MX","FM","MD","MC","MN","ME","MS",
+    "MA","MZ","MM","NA","NR","NP","NL","NC","NZ","NI","NE","NG","NU","NF","MK",
+    "MP","NO","OM","PK","PW","PS","PA","PG","PY","PE","PH","PN","PL","PT","PR",
+    "QA","RE","RO","RU","RW","BL","SH","KN","LC","MF","PM","VC","WS","SM","ST",
+    "SA","SN","RS","SC","SL","SG","SX","SK","SI","SB","SO","ZA","GS","SS","ES",
+    "LK","SD","SR","SJ","SE","CH","SY","TW","TJ","TZ","TH","TL","TG","TK","TO",
+    "TT","TN","TR","TM","TC","TV","UG","UA","AE","GB","US","UM","UY","UZ","VU",
+    "VE","VN","VG","VI","WF","EH","YE","ZM","ZW",
+})
+
 
 # ── Issue dataclass ───────────────────────────────────────────────────────────
 
@@ -157,11 +179,17 @@ def validate_iswc(iswc: str) -> str | None:
 # ── NARM config codes ─────────────────────────────────────────────────────────
 
 _KNOWN_NARM_CODES: dict[str, str] = {
-    "00": "Album",
-    "02": "Single",
-    "04": "EP",
-    "05": "Box Set",
-    "06": "Compilation",
+    "00": "LP",
+    "02": "CD",
+    "20": "7-inch Single",
+    "21": "12-inch Single",
+    "22": "Cassette Single",
+    "25": "CD Single",
+    "04": "Cassette Album",
+    "40": "DVD Video",
+    "41": "DVD Album",
+    "50": "VHS Video",
+    "07": "MxCD Single",
 }
 
 
@@ -291,10 +319,84 @@ def _validate_release(release: ParsedRelease, today: date) -> list[BulkIssue]:
             severity="warning",
             rule_id="BULK_IMPRINT_MISSING",
             rule_name="Missing Imprint and Label",
-            message="Missing imprint and label — required for rights attribution and royalty routing",
+            message=(
+                "Missing label name, label abbreviation, and imprint — required for "
+                "Luminate Market Share claims and royalty routing"
+            ),
             fix_hint=(
-                "Add the imprint name and parent label. These fields are required by Luminate "
-                "for rights attribution and by distributors for royalty routing."
+                "Add the imprint name, parent label, and label abbreviation. These fields "
+                "are required by Luminate for Market Share reference file submissions and "
+                "by distributors for royalty routing."
+            ),
+            scope="per_release",
+            row_number=row,
+        ))
+
+    # ── Label abbreviation ────────────────────────────────────────────────────
+    if release.label_abbreviation:
+        abbr = release.label_abbreviation
+        if len(abbr) < 1 or len(abbr) > 10:
+            issues.append(_issue(
+                severity="warning",
+                rule_id="BULK_LABEL_ABBR_INVALID",
+                rule_name="Invalid Label Abbreviation",
+                message=(
+                    f"Label abbreviation '{abbr}' must be 1–10 characters "
+                    f"(got {len(abbr)})"
+                ),
+                fix_hint="Use a short label code of 1–10 alphanumeric characters.",
+                scope="per_release",
+                row_number=row,
+            ))
+        elif not re.match(r"^[A-Za-z0-9 _\-]+$", abbr):
+            issues.append(_issue(
+                severity="warning",
+                rule_id="BULK_LABEL_ABBR_INVALID",
+                rule_name="Invalid Label Abbreviation",
+                message=f"Label abbreviation '{abbr}' contains special characters",
+                fix_hint=(
+                    "Label abbreviation must contain only letters, digits, "
+                    "spaces, hyphens, or underscores."
+                ),
+                scope="per_release",
+                row_number=row,
+            ))
+
+    # ── Country code ──────────────────────────────────────────────────────────
+    if release.country_code:
+        cc = release.country_code.strip().upper()
+        if not re.match(r"^[A-Z]{2}$", cc):
+            issues.append(_issue(
+                severity="warning",
+                rule_id="BULK_COUNTRY_CODE_INVALID",
+                rule_name="Invalid Country Code",
+                message=f"Country code '{release.country_code}' must be a 2-letter ISO code (e.g. US, GB)",
+                fix_hint="Use a valid ISO 3166-1 alpha-2 country code (2 uppercase letters).",
+                scope="per_release",
+                row_number=row,
+            ))
+        elif cc not in _ISO_COUNTRY_CODES:
+            issues.append(_issue(
+                severity="warning",
+                rule_id="BULK_COUNTRY_CODE_INVALID",
+                rule_name="Invalid Country Code",
+                message=f"Country code '{cc}' is not a recognized ISO 3166-1 alpha-2 code",
+                fix_hint=(
+                    "Use a valid ISO 3166-1 alpha-2 country code. "
+                    "Examples: US, GB, FR, DE, JP, AU."
+                ),
+                scope="per_release",
+                row_number=row,
+            ))
+    else:
+        issues.append(_issue(
+            severity="warning",
+            rule_id="BULK_COUNTRY_CODE_MISSING",
+            rule_name="Missing Country Code",
+            message="Missing country code — required for Luminate Market Share reference file submissions",
+            fix_hint=(
+                "Add 2-letter ISO country code (e.g., US for United States). "
+                "Required for all Luminate Market Share claimants."
             ),
             scope="per_release",
             row_number=row,

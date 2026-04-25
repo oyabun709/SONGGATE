@@ -1,0 +1,13 @@
+ISRC|Artist|Title|ReleaseDate|LabelAbbreviation|LabelName|CountryCode
+US-PR1-26-00001|Bill Evans Trio|Waltz for Debby|041526|RVRSD|Riverside Records|US
+US-PR1-26-00002|Bill Evans Trio|My Foolish Heart|041526|RVRSD|Riverside Records|US
+US-PR1-26-00003|Art Blakey & The Jazz Messengers|Moanin|032626|BNJZ|Blue Note Records|US
+US-PR1-26-00004|Art Blakey & The Jazz Messengers|Blues March|032626|BNJZ|Blue Note Records|US
+US-PR1-26-00005|Charles Mingus|Goodbye Pork Pie Hat|050126|IMPLS|Impulse! Records|US
+US-PR1-26-00001|Coltrane John|My Favorite Things|061526|ATLNT|Atlantic Records|US
+INVALID-ISRC-007|John Coltrane|Naima|061526|ATLNT|Atlantic Records|US
+US-PR1-26-00008|Miles Davis|So What|070126|CLMB|Columbia Records
+US-PR1-26-00009|Miles Davis|Freddie Freeloader|070126|CLMB|Columbia Records
+US-PR1-26-00010|The Bill Evans Trio|Peace Piece|041526|RVRSD|Riverside Records|US
+US-PR1-26-00011|Thelonious Monk|Round Midnight|081526||Prestige Records|US
+US-PR1-26-00012|Thelonious Monk|Blue Monk|081526|PRST|Prestige Records|US
