@@ -37,36 +37,27 @@ const SLIDES = [
 // ─── Individual slides ────────────────────────────────────────────────────────
 
 function Slide01Cover() {
-  const [copied, setCopied] = useState(false);
-  function copyEmail() {
-    navigator.clipboard.writeText("andrew@housesonhills.io").catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
   return (
     <div className="flex flex-col items-center justify-center h-full text-center gap-6 sm:gap-8">
       <div className="flex items-center gap-3 mb-1">
         <Zap className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: ACCENT }} />
         <span className="text-3xl sm:text-5xl font-black tracking-tight">SONGGATE</span>
       </div>
-      <p className="text-lg sm:text-2xl font-light text-slate-300 max-w-xl leading-snug">
-        Pre-flight every release.
-        <br />
-        <span className="text-white font-medium">Catch errors before they cost you.</span>
-      </p>
+      <div className="space-y-2">
+        <p className="text-lg sm:text-2xl font-medium text-white max-w-xl leading-snug">
+          Catch release errors before they cost you.
+        </p>
+        <p className="text-sm sm:text-base font-light text-slate-400 max-w-xl leading-snug">
+          Single releases. Full catalogs. Reference files. One platform.
+        </p>
+      </div>
       <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full sm:w-auto px-4 sm:px-0">
-        <a
-          href="mailto:andrew@housesonhills.io?subject=SONGGATE Demo Request"
+        <Link
+          href="/demo"
           className="flex items-center justify-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-white transition-opacity"
           style={{ background: ACCENT }}
         >
-          Book a demo <ArrowRight className="h-4 w-4" />
-        </a>
-        <Link
-          href="/onboarding"
-          className="flex items-center justify-center gap-2 rounded-lg px-7 py-3 text-sm font-semibold text-slate-300 border border-slate-700 hover:border-slate-500 transition-colors"
-        >
-          See live product
+          See live demo <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
       <p className="text-xs text-slate-500 mt-1">
@@ -135,6 +126,11 @@ function Slide02Problem() {
           </ul>
         </div>
       </div>
+      <div className="rounded-lg border border-amber-900/40 bg-amber-950/20 px-4 sm:px-5 py-3 max-w-4xl mx-auto w-full">
+        <p className="text-xs sm:text-sm text-amber-300 text-center leading-relaxed">
+          For operations teams submitting weekly reference files, one undetected error can cost an entire week of market share claims.
+        </p>
+      </div>
     </div>
   );
 }
@@ -146,12 +142,13 @@ function Slide03Gap() {
     "DSP readiness scoring",
     "DDEX ERN native",
     "API access",
+    "Bulk catalog and reference file validation",
   ];
   const tools = [
-    { name: "DDEX\nValidator", vals: [false, true, false, true, false] },
-    { name: "FUGA /\nCD Baby", vals: [false, false, false, false, false] },
-    { name: "DistroKid", vals: [false, false, false, false, false] },
-    { name: "SONGGATE", vals: [true, true, true, true, true], highlight: true },
+    { name: "DDEX\nValidator", vals: [false, true, false, true, false, false] },
+    { name: "FUGA /\nCD Baby", vals: [false, false, false, false, false, false] },
+    { name: "DistroKid", vals: [false, false, false, false, false, false] },
+    { name: "SONGGATE", vals: [true, true, true, true, true, true], highlight: true },
   ];
 
   return (
@@ -533,12 +530,6 @@ function Slide09WhoBuysThis() {
 }
 
 function Slide10Ask() {
-  const [copied, setCopied] = useState(false);
-  function copyEmail() {
-    navigator.clipboard.writeText("andrew@housesonhills.io").catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
   const rows = [
     {
       type: "Pilot",
@@ -589,21 +580,21 @@ function Slide10Ask() {
           </div>
         ))}
       </div>
-      <div className="flex justify-center mt-1 sm:mt-2">
-        <button
-          onClick={copyEmail}
+      <div className="flex flex-col items-center gap-2 mt-1 sm:mt-2">
+        <Link
+          href="/onboarding"
           className="flex items-center gap-2 rounded-lg px-6 sm:px-8 py-3 sm:py-3.5 text-sm font-semibold text-white shadow-lg transition-opacity"
           style={{ background: ACCENT }}
         >
-          {copied ? "Email copied!" : <>Get in touch <ArrowRight className="h-4 w-4" /></>}
-        </button>
+          Start free trial <ArrowRight className="h-4 w-4" />
+        </Link>
+        <p className="text-xs text-slate-500">
+          or email{" "}
+          <a href="mailto:andrew@housesonhills.io" className="underline hover:text-slate-300 transition-colors">
+            andrew@housesonhills.io
+          </a>
+        </p>
       </div>
-      <p className="text-center text-xs text-slate-600">
-        <a href="mailto:andrew@housesonhills.io" className="underline hover:text-slate-400 transition-colors">
-          andrew@housesonhills.io
-        </a>
-        {" "}· songgate.io
-      </p>
     </div>
   );
 }

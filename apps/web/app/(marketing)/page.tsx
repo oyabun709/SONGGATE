@@ -7,9 +7,10 @@ import Link from "next/link";
 import {
   Zap,
   ShieldCheck,
-  BarChart3,
-  GitBranch,
   Database,
+  FileCheck2,
+  Hash,
+  GitBranch,
   ArrowRight,
   CheckCircle2,
   XCircle,
@@ -20,31 +21,39 @@ const FEATURES = [
     icon: ShieldCheck,
     title: "Pre-flight every release",
     description:
-      "Run 40+ rules across DDEX structure, metadata completeness, artwork resolution, and fraud signals — before you deliver to any DSP.",
+      "Run 40+ rules across DDEX ERN 4.3 structure, DSP-specific metadata, artwork resolution, and fraud signals before delivery. Every release gets a readiness score and a plain-English fix list.",
     color: "text-indigo-600",
     bg: "bg-indigo-50",
   },
   {
-    icon: BarChart3,
-    title: "DSP readiness scores",
+    icon: Database,
+    title: "Bulk catalog validation",
     description:
-      "Know exactly where you stand on Spotify, Apple Music, Amazon, Tidal, and 10+ other platforms. Each release gets a readiness score and a PASS / WARN / FAIL grade.",
+      "Submit your entire catalog for pre-delivery QA. SONGGATE catches duplicate EANs, artist name inconsistencies, and missing identifiers across hundreds of releases before they propagate into downstream rights systems.",
     color: "text-emerald-600",
     bg: "bg-emerald-50",
   },
   {
-    icon: GitBranch,
-    title: "Fits your workflow",
+    icon: FileCheck2,
+    title: "Reference file compliance",
     description:
-      "Ingest DDEX ERN 4.3 packages, CSV uploads, or JSON via the REST API. Drop it into your existing pipeline or use the dashboard.",
+      "Validate EAN and ISRC reference files against submission requirements. Catches NARM code errors, missing country codes, invalid label fields, and duplicate identifiers — before the submission cutoff.",
     color: "text-violet-600",
     bg: "bg-violet-50",
   },
   {
-    icon: Database,
-    title: "Bulk Catalog Validation",
+    icon: Hash,
+    title: "Identifier validation",
     description:
-      "Submit your entire catalog for pre-delivery QA. SONGGATE catches duplicate EANs, artist name inconsistencies, and missing identifiers across hundreds of releases — before they propagate into downstream rights systems.",
+      "ISNI and ISWC checks on every submission. Flags missing identifiers, format errors, and artist name inconsistencies that cause matching failures in downstream rights and royalty systems.",
+    color: "text-amber-600",
+    bg: "bg-amber-50",
+  },
+  {
+    icon: GitBranch,
+    title: "Built for your pipeline",
+    description:
+      "REST API, webhooks, and dashboard. Accepts DDEX ERN 4.3, CSV, JSON, bulk EAN registration, and ISRC reference files. Drops into your existing workflow or runs standalone.",
     color: "text-indigo-600",
     bg: "bg-indigo-50",
   },
@@ -103,15 +112,15 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 pb-20 pt-24 text-center">
         <h1 className="text-4xl font-bold leading-tight tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-          Stop releasing with
+          Catch release errors
           <br />
-          <span className="text-indigo-600">metadata errors.</span>
+          <span className="text-indigo-600">before they cost you.</span>
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-lg text-slate-500">
-          Pre-flight every release and every catalog submission before delivery.
-          SONGGATE runs 40+ validation rules across DDEX structure, metadata,
-          bulk EAN registration, and fraud signals — and scores your readiness
-          for every major DSP.
+          SONGGATE validates single releases, full catalogs, and reference files
+          before they reach DSPs or downstream rights systems. One readiness
+          score. Plain-English fixes. Built for labels, distributors, and rights
+          operations teams.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <a
@@ -195,11 +204,11 @@ export default function LandingPage() {
       {/* Features */}
       <section className="mx-auto max-w-5xl px-6 py-20">
         <h2 className="mb-12 text-center text-3xl font-bold tracking-tight">
-          Everything between your session
+          One platform. Every stage
           <br />
-          and the store shelf
+          of delivery.
         </h2>
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map(({ icon: Icon, title, description, color, bg }) => (
             <div key={title} className="rounded-xl border border-slate-100 p-6">
               <div
@@ -222,11 +231,12 @@ export default function LandingPage() {
           <p className="mb-8 text-center text-sm font-medium uppercase tracking-widest text-slate-400">
             Built for teams that ship music at scale
           </p>
-          <div className="grid grid-cols-3 gap-4 sm:gap-8 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8 text-center">
             {[
               { stat: "40+", label: "Validation rules" },
-              { stat: "15 DSPs", label: "Readiness profiles" },
-              { stat: "< 45s", label: "Average scan time" },
+              { stat: "2", label: "Reference file formats supported" },
+              { stat: "15", label: "DSP readiness profiles" },
+              { stat: "Weekly", label: "Submission tracking" },
             ].map(({ stat, label }) => (
               <div key={label}>
                 <div className="text-3xl font-bold text-slate-900">{stat}</div>
@@ -272,10 +282,13 @@ export default function LandingPage() {
       {/* CTA */}
       <section className="bg-indigo-600 py-20 text-center text-white">
         <h2 className="mb-4 text-3xl font-bold tracking-tight">
-          Ready to pre-flight your next release?
+          Ready to catch errors before
+          <br />
+          they cost you?
         </h2>
         <p className="mb-8 text-indigo-200">
-          Talk to us — we&apos;ll show you exactly how SONGGATE fits your workflow.
+          SONGGATE works for labels, distributors, and rights operations teams.
+          Email us and we&apos;ll show you how it fits your specific workflow.
         </p>
         <a
           href="mailto:andrew@housesonhills.io?subject=SONGGATE Demo Request"
