@@ -171,8 +171,35 @@ def score_bulk_scan(
     # ── Identifier coverage stats ─────────────────────────────────────────────
     identifier_coverage = _identifier_coverage(releases, issues)
 
-    # ── Enricher stub ─────────────────────────────────────────────────────────
-    enrichment_status = "pending_api_integration"
+    # ── Enrichment suggestions (ArtistMatch + WorksMatch) ─────────────────────
+    enrichment_by_row: dict[int, dict] = {}
+    for release in releases:
+        enrich_input = {
+            "artist": release.artist,
+            "title":  release.title,
+            "isrc":   getattr(release, "isrc", "") or "",
+        }
+        enriched = _enricher.enrich_release(enrich_input)
+        enrichment_by_row[release.row_number] = enriched
+
+    enrichment_mock = _enricher.mock
+    enrichment_status = "enriched_mock" if enrichment_mock else "enriched"
+
+    # Attach enrichment suggestions to per-release entries
+    for entry in per_release_out:
+        row_num = entry["row_number"]
+        enriched = enrichment_by_row.get(row_num, {})
+        entry["enrichment"] = {
+            "suggested_isni":     enriched.get("suggested_isni"),
+            "isni_confidence":    enriched.get("isni_confidence", 0.0),
+            "isni_source":        enriched.get("isni_source", "not_found"),
+            "isni_match_quality": enriched.get("isni_match_quality", "none"),
+            "suggested_iswc":     enriched.get("suggested_iswc"),
+            "iswc_confidence":    enriched.get("iswc_confidence", 0.0),
+            "iswc_source":        enriched.get("iswc_source", "not_found"),
+            "iswc_match_quality": enriched.get("iswc_match_quality", "none"),
+            "mock":               enriched.get("enrichment_mock", True),
+        }
 
     return {
         "score": score,
