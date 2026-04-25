@@ -115,7 +115,7 @@ export default function DocsPage() {
             <p className="text-lg text-slate-500 max-w-2xl">
               Integrate SONGGATE release validation directly into your distribution pipeline.
               Catch DDEX errors, DSP metadata issues, and bulk registration problems before they
-              reach Luminate.
+              reach DSPs or downstream rights systems.
             </p>
             <div className="flex items-center gap-3 pt-2">
               <Link
@@ -262,8 +262,9 @@ X-RateLimit-Reset: 1714000060`}</CodeBlock>
           {/* Bulk registration */}
           <Section id="bulk" title="Bulk registration">
             <p className="text-slate-600 leading-relaxed">
-              Validate Luminate Market Share bulk registration files (pipe-delimited EAN format)
-              and ISRC reference files before submission.
+              Validate bulk registration files (pipe-delimited EAN format) and ISRC reference
+              files before submission. SONGGATE checks EAN formats, NARM configuration codes,
+              imprint/label presence, duplicate detection, and identifier coverage.
             </p>
 
             <h3 className="text-base font-semibold text-slate-800">Scan a bulk file</h3>
@@ -271,12 +272,85 @@ X-RateLimit-Reset: 1714000060`}</CodeBlock>
             <CodeBlock>{`curl -X POST ${BASE}/scans/bulk \\
   -H "Authorization: Bearer <clerk_token>" \\
   -F "file=@bulk_registration.txt"`}</CodeBlock>
+            <p className="text-sm text-slate-500">
+              File format: pipe-delimited (<code className="rounded bg-slate-100 px-1 font-mono">|</code>) or CSV.
+              Required columns: <code className="rounded bg-slate-100 px-1 font-mono">EAN | Artist | Title | Release Date | Imprint | Label | NARM Config</code>.
+              Optional: <code className="rounded bg-slate-100 px-1 font-mono">ISNI | ISWC</code>.
+            </p>
 
             <h3 className="text-base font-semibold text-slate-800 mt-6">Scan an ISRC file</h3>
             <EndpointBadge method="POST" path="/scans/isrc" />
             <CodeBlock>{`curl -X POST ${BASE}/scans/isrc \\
   -H "Authorization: Bearer <clerk_token>" \\
   -F "file=@isrc_reference.txt"`}</CodeBlock>
+
+            <h3 className="text-base font-semibold text-slate-800 mt-6">ISRC format reference</h3>
+            <p className="text-slate-600 text-sm leading-relaxed">
+              ISRCs must follow ISO 3901: <code className="rounded bg-slate-100 px-1 font-mono">CC-XXX-YY-NNNNN</code> (with or without hyphens, 12 characters when stripped).
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="py-2 pr-4 text-left font-semibold text-slate-700">Segment</th>
+                    <th className="py-2 pr-4 text-left font-semibold text-slate-700">Length</th>
+                    <th className="py-2 text-left font-semibold text-slate-700">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ["CC",    "2 chars", "Country code — ISO 3166-1 alpha-2 (e.g. US, GB)"],
+                    ["XXX",   "3 chars", "Registrant code assigned by national ISRC agency"],
+                    ["YY",    "2 digits", "Year of reference (last 2 digits)"],
+                    ["NNNNN","5 digits", "Designation code — unique per registrant per year"],
+                  ].map(([seg, len, desc]) => (
+                    <tr key={seg} className="border-b border-slate-100">
+                      <td className="py-2 pr-4 font-mono font-semibold text-slate-700">{seg}</td>
+                      <td className="py-2 pr-4 text-slate-500">{len}</td>
+                      <td className="py-2 text-slate-600">{desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <h3 className="text-base font-semibold text-slate-800 mt-6">NARM configuration codes</h3>
+            <p className="text-slate-600 text-sm leading-relaxed">
+              The <code className="rounded bg-slate-100 px-1 font-mono">NARM Config</code> field in bulk registration files must contain one of the following codes:
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className="py-2 pr-4 text-left font-semibold text-slate-700">Code</th>
+                    <th className="py-2 text-left font-semibold text-slate-700">Configuration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ["00", "LP"],
+                    ["02", "CD"],
+                    ["04", "Cassette Album"],
+                    ["07", "MxCD Single"],
+                    ["20", "7-inch Single"],
+                    ["21", "12-inch Single"],
+                    ["22", "Cassette Single"],
+                    ["25", "CD Single"],
+                    ["40", "DVD Video"],
+                    ["41", "DVD Album"],
+                    ["50", "VHS Video"],
+                  ].map(([code, config]) => (
+                    <tr key={code} className="border-b border-slate-100">
+                      <td className="py-2 pr-4 font-mono font-semibold text-indigo-700">{code}</td>
+                      <td className="py-2 text-slate-600">{config}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-slate-400 mt-2">
+              Unknown codes trigger a <code className="rounded bg-slate-100 px-1 font-mono">BULK_NARM_UNKNOWN</code> warning. SONGGATE validates against this table on every scan.
+            </p>
           </Section>
 
           {/* Webhooks */}
