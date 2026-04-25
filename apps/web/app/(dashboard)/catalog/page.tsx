@@ -7,6 +7,8 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   RefreshCw,
   Info,
@@ -54,6 +56,24 @@ interface Coverage {
   iswc_pct: number;
 }
 
+interface PaginatedConflicts {
+  data: EANConflict[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+interface PaginatedVariants {
+  data: ArtistVariant[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+const PER_PAGE = 25;
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string | null): string {
@@ -61,6 +81,55 @@ function fmtDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString(undefined, {
     year: "numeric", month: "short", day: "numeric",
   });
+}
+
+// ── Pagination control ────────────────────────────────────────────────────────
+
+function Pagination({
+  page,
+  totalPages,
+  total,
+  perPage,
+  loading,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  perPage: number;
+  loading: boolean;
+  onPage: (p: number) => void;
+}) {
+  const start = Math.min((page - 1) * perPage + 1, total);
+  const end   = Math.min(page * perPage, total);
+  return (
+    <div className="flex items-center justify-between pt-2">
+      <p className="text-xs text-slate-400 tabular-nums">
+        {total === 0 ? "No results" : `Showing ${start}–${end} of ${total}`}
+      </p>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPage(page - 1)}
+          disabled={page <= 1 || loading}
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
+        <span className="min-w-[4rem] text-center text-xs tabular-nums text-slate-500">
+          {page} / {totalPages}
+        </span>
+        <button
+          onClick={() => onPage(page + 1)}
+          disabled={page >= totalPages || loading}
+          className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          aria-label="Next page"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -275,29 +344,66 @@ function EmptyState({ message }: { message: string }) {
 
 export default function CatalogPage() {
   const { getToken } = useAuth();
-  const [token, setToken]           = useState("");
-  const [loading, setLoading]       = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats]           = useState<CatalogStats | null>(null);
-  const [conflicts, setConflicts]   = useState<EANConflict[]>([]);
-  const [variants, setVariants]     = useState<ArtistVariant[]>([]);
-  const [coverage, setCoverage]     = useState<Coverage | null>(null);
-  const [error, setError]           = useState<string | null>(null);
+  const [token, setToken]             = useState("");
+  const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [stats, setStats]             = useState<CatalogStats | null>(null);
+  const [conflictData, setConflictData] = useState<PaginatedConflicts | null>(null);
+  const [variantData, setVariantData]   = useState<PaginatedVariants | null>(null);
+  const [coverage, setCoverage]       = useState<Coverage | null>(null);
+  const [error, setError]             = useState<string | null>(null);
+
+  // Pagination state
+  const [conflictPage, setConflictPage] = useState(1);
+  const [variantPage, setVariantPage]   = useState(1);
+  const [conflictLoading, setConflictLoading] = useState(false);
+  const [variantLoading, setVariantLoading]   = useState(false);
+
+  const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+  const fetchConflicts = useCallback(async (tok: string, page: number) => {
+    setConflictLoading(true);
+    try {
+      const res = await fetch(
+        `${API}/catalog/conflicts?page=${page}&per_page=${PER_PAGE}`,
+        { headers: { Authorization: `Bearer ${tok}` } },
+      );
+      if (!res.ok) throw new Error("Failed to load conflicts");
+      const data: PaginatedConflicts = await res.json();
+      setConflictData(data);
+    } finally {
+      setConflictLoading(false);
+    }
+  }, [API]);
+
+  const fetchVariants = useCallback(async (tok: string, page: number) => {
+    setVariantLoading(true);
+    try {
+      const res = await fetch(
+        `${API}/catalog/artist-variants?page=${page}&per_page=${PER_PAGE}`,
+        { headers: { Authorization: `Bearer ${tok}` } },
+      );
+      if (!res.ok) throw new Error("Failed to load artist variants");
+      const data: PaginatedVariants = await res.json();
+      setVariantData(data);
+    } finally {
+      setVariantLoading(false);
+    }
+  }, [API]);
 
   const fetchAll = useCallback(async (tok: string, silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     setError(null);
 
-    const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     const headers = { Authorization: `Bearer ${tok}` };
 
     try {
       const [statsRes, conflictsRes, variantsRes, coverageRes] = await Promise.all([
-        fetch(`${API}/catalog/stats`,           { headers }),
-        fetch(`${API}/catalog/conflicts`,       { headers }),
-        fetch(`${API}/catalog/artist-variants`, { headers }),
-        fetch(`${API}/catalog/coverage`,        { headers }),
+        fetch(`${API}/catalog/stats`,                                                  { headers }),
+        fetch(`${API}/catalog/conflicts?page=1&per_page=${PER_PAGE}`,                 { headers }),
+        fetch(`${API}/catalog/artist-variants?page=1&per_page=${PER_PAGE}`,           { headers }),
+        fetch(`${API}/catalog/coverage`,                                               { headers }),
       ]);
 
       if (!statsRes.ok) throw new Error("Failed to load catalog stats");
@@ -310,8 +416,10 @@ export default function CatalogPage() {
       ]);
 
       setStats(s);
-      setConflicts(Array.isArray(c) ? c : []);
-      setVariants(Array.isArray(v) ? v : []);
+      setConflictData(c);
+      setConflictPage(1);
+      setVariantData(v);
+      setVariantPage(1);
       setCoverage(cov);
     } catch (e) {
       setError((e as Error).message);
@@ -319,7 +427,7 @@ export default function CatalogPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [API]);
 
   useEffect(() => {
     getToken().then((t) => {
@@ -330,6 +438,16 @@ export default function CatalogPage() {
     });
   }, [getToken, fetchAll]);
 
+  const handleConflictPage = (p: number) => {
+    setConflictPage(p);
+    fetchConflicts(token, p);
+  };
+
+  const handleVariantPage = (p: number) => {
+    setVariantPage(p);
+    fetchVariants(token, p);
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -339,6 +457,8 @@ export default function CatalogPage() {
   }
 
   const isEmpty = !stats || stats.total_releases === 0;
+  const conflicts = conflictData?.data ?? [];
+  const variants  = variantData?.data  ?? [];
 
   return (
     <div className="space-y-8">
@@ -422,7 +542,7 @@ export default function CatalogPage() {
               <span className="text-xs text-slate-400">Same EAN, different metadata across scans</span>
             </div>
 
-            {conflicts.length === 0 ? (
+            {conflicts.length === 0 && !conflictLoading ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-center">
                 <p className="text-sm font-medium text-emerald-700">No EAN conflicts detected</p>
                 <p className="text-xs text-emerald-600 mt-0.5">
@@ -430,8 +550,18 @@ export default function CatalogPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className={cn("space-y-2", conflictLoading && "opacity-60 pointer-events-none")}>
                 {conflicts.map(c => <ConflictRow key={c.ean} conflict={c} />)}
+                {conflictData && conflictData.total_pages > 1 && (
+                  <Pagination
+                    page={conflictPage}
+                    totalPages={conflictData.total_pages}
+                    total={conflictData.total}
+                    perPage={PER_PAGE}
+                    loading={conflictLoading}
+                    onPage={handleConflictPage}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -441,16 +571,16 @@ export default function CatalogPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
                 Artist Name Variants
-                {variants.length > 0 && (
+                {variantData && variantData.total > 0 && (
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                    {variants.length} artist{variants.length !== 1 ? "s" : ""}
+                    {variantData.total} artist{variantData.total !== 1 ? "s" : ""}
                   </span>
                 )}
               </h2>
               <span className="text-xs text-slate-400">Same normalized name, different raw formats</span>
             </div>
 
-            {variants.length === 0 ? (
+            {variants.length === 0 && !variantLoading ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-5 py-4 text-center">
                 <p className="text-sm font-medium text-emerald-700">No artist name variants detected</p>
                 <p className="text-xs text-emerald-600 mt-0.5">
@@ -458,8 +588,18 @@ export default function CatalogPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className={cn("space-y-2", variantLoading && "opacity-60 pointer-events-none")}>
                 {variants.map(v => <ArtistVariantRow key={v.normalized} variant={v} />)}
+                {variantData && variantData.total_pages > 1 && (
+                  <Pagination
+                    page={variantPage}
+                    totalPages={variantData.total_pages}
+                    total={variantData.total}
+                    perPage={PER_PAGE}
+                    loading={variantLoading}
+                    onPage={handleVariantPage}
+                  />
+                )}
               </div>
             )}
           </div>

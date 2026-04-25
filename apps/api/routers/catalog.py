@@ -12,7 +12,9 @@ GET /catalog/coverage        — ISNI/ISWC identifier coverage breakdown
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+import math
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -104,21 +106,44 @@ async def get_catalog_stats(
 
 @router.get("/conflicts")
 async def get_catalog_conflicts(
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    per_page: int = Query(25, ge=1, le=100, description="Results per page (max 100)"),
     db: AsyncSession = Depends(get_db),
     org: Organization = Depends(get_current_org),
 ):
     """
-    EANs with conflicting metadata across catalog submissions.
+    EANs with conflicting metadata across catalog submissions, paginated.
 
     An EAN is "conflicted" when it appears in catalog_index with:
     - Different normalized artist names (critical)
     - Different normalized titles (warning)
     - Different ISNIs (critical)
 
-    Returns a list sorted by severity (critical first), then EAN.
+    Returns paginated list sorted by severity (critical first), then EAN.
     """
+    _CONFLICT_FILTER = """
+        HAVING COUNT(DISTINCT artist_normalized) > 1
+            OR COUNT(DISTINCT title_normalized) > 1
+            OR (COUNT(DISTINCT isni) FILTER (WHERE isni IS NOT NULL AND isni != '')) > 1
+    """
+
+    # Total count for pagination
+    count_result = await db.execute(
+        text(f"""
+            SELECT COUNT(*) FROM (
+                SELECT ean FROM catalog_index
+                WHERE org_id = :org_id
+                GROUP BY ean
+                {_CONFLICT_FILTER}
+            ) AS subq
+        """),
+        {"org_id": str(org.id)},
+    )
+    total = int(count_result.scalar() or 0)
+    offset = (page - 1) * per_page
+
     rows = await db.execute(
-        text("""
+        text(f"""
             SELECT
                 ean,
                 array_agg(DISTINCT artist   ORDER BY artist)  AS artist_variants,
@@ -133,21 +158,19 @@ async def get_catalog_conflicts(
             FROM catalog_index
             WHERE org_id = :org_id
             GROUP BY ean
-            HAVING COUNT(DISTINCT artist_normalized) > 1
-                OR COUNT(DISTINCT title_normalized) > 1
-                OR (COUNT(DISTINCT isni) FILTER (WHERE isni IS NOT NULL AND isni != '')) > 1
+            {_CONFLICT_FILTER}
             ORDER BY has_artist_conflict DESC, ean
-            LIMIT 200
+            LIMIT :limit OFFSET :offset
         """),
-        {"org_id": str(org.id)},
+        {"org_id": str(org.id), "limit": per_page, "offset": offset},
     )
 
-    result = []
+    data = []
     for row in rows.mappings().all():
         has_artist = bool(row["has_artist_conflict"])
         has_isni   = bool(row["has_isni_conflict"])
         severity   = "critical" if has_artist or has_isni else "warning"
-        result.append({
+        data.append({
             "ean":               row["ean"],
             "artist_variants":   list(row["artist_variants"] or []),
             "title_variants":    list(row["title_variants"]  or []),
@@ -159,11 +182,19 @@ async def get_catalog_conflicts(
             "last_seen":         row["last_seen"].isoformat()   if row["last_seen"]   else None,
             "severity":          severity,
         })
-    return result
+    return {
+        "data":        data,
+        "total":       total,
+        "page":        page,
+        "per_page":    per_page,
+        "total_pages": max(1, math.ceil(total / per_page)) if total else 1,
+    }
 
 
 @router.get("/artist-variants")
 async def get_artist_variants(
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    per_page: int = Query(25, ge=1, le=100, description="Results per page (max 100)"),
     db: AsyncSession = Depends(get_db),
     org: Organization = Depends(get_current_org),
 ):
@@ -174,8 +205,25 @@ async def get_artist_variants(
     Example: "RZA & Juice Crew" and "RZA, Juice Crew" both normalize to
     "rza and juice crew" — one disambiguation entry is returned.
 
-    Returns sorted by EAN count descending (highest-impact variants first).
+    Returns paginated, sorted by EAN count descending (highest-impact variants first).
     """
+    count_result = await db.execute(
+        text("""
+            SELECT COUNT(*) FROM (
+                SELECT artist_normalized
+                FROM catalog_index
+                WHERE org_id = :org_id
+                  AND artist_normalized IS NOT NULL
+                  AND artist_normalized != ''
+                GROUP BY artist_normalized
+                HAVING COUNT(DISTINCT artist) > 1
+            ) AS subq
+        """),
+        {"org_id": str(org.id)},
+    )
+    total = int(count_result.scalar() or 0)
+    offset = (page - 1) * per_page
+
     rows = await db.execute(
         text("""
             SELECT
@@ -193,33 +241,39 @@ async def get_artist_variants(
             GROUP BY artist_normalized
             HAVING COUNT(DISTINCT artist) > 1
             ORDER BY COUNT(DISTINCT ean) DESC, artist_normalized
-            LIMIT 200
+            LIMIT :limit OFFSET :offset
         """),
-        {"org_id": str(org.id)},
+        {"org_id": str(org.id), "limit": per_page, "offset": offset},
     )
 
-    result = []
+    data = []
     for row in rows.mappings().all():
         unique_isni = int(row["unique_isni_count"] or 0)
         with_isni   = int(row["with_isni_count"]   or 0)
-        total       = int(row["total_count"])
+        total_count = int(row["total_count"])
 
         if unique_isni > 1:
             isni_status = "conflicting"
-        elif with_isni > 0 and with_isni < total:
+        elif with_isni > 0 and with_isni < total_count:
             isni_status = "partial"
-        elif with_isni == total and total > 0:
+        elif with_isni == total_count and total_count > 0:
             isni_status = "present"
         else:
             isni_status = "missing"
 
-        result.append({
+        data.append({
             "normalized":   row["normalized"],
             "raw_variants": list(row["raw_variants"] or []),
             "ean_count":    int(row["ean_count"]),
             "isni_status":  isni_status,
         })
-    return result
+    return {
+        "data":        data,
+        "total":       total,
+        "page":        page,
+        "per_page":    per_page,
+        "total_pages": max(1, math.ceil(total / per_page)) if total else 1,
+    }
 
 
 @router.get("/coverage")
