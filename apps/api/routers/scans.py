@@ -268,6 +268,8 @@ async def create_bulk_scan(
         scan_id=str(db_scan.id),
         releases=releases,
         org_id=str(org.id),
+        critical_count=scan_result["critical_count"],
+        warning_count=scan_result["warning_count"],
     )
 
     return JSONResponse(content={
@@ -448,10 +450,13 @@ async def _index_bulk_releases_background(
     scan_id: str,
     releases: list,
     org_id: str,
+    critical_count: int = 0,
+    warning_count: int = 0,
 ) -> None:
-    """Background task: write bulk scan releases into the catalog_index corpus."""
+    """Background task: write bulk scan releases into the catalog_index corpus
+    and update the weekly_submissions calendar."""
     from database import AsyncSessionLocal
-    from services.bulk.catalog_indexer import index_scan_releases
+    from services.bulk.catalog_indexer import index_scan_releases, record_weekly_submission
     import logging
 
     try:
@@ -462,6 +467,14 @@ async def _index_bulk_releases_background(
                 releases=releases,
                 org_id=uuid.UUID(org_id),
                 is_demo=False,
+            )
+        async with AsyncSessionLocal() as db:
+            await record_weekly_submission(
+                db=db,
+                org_id=org_id,
+                release_count=len(releases),
+                critical_count=critical_count,
+                warning_count=warning_count,
             )
     except Exception:
         logging.getLogger(__name__).exception(

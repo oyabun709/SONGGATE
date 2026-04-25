@@ -13,6 +13,7 @@ GET /catalog/coverage        — ISNI/ISWC identifier coverage breakdown
 from __future__ import annotations
 
 import math
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
@@ -320,3 +321,68 @@ async def get_coverage(
         "isni_pct":       round(with_isni / total * 100, 1) if total else 0.0,
         "iswc_pct":       round(with_iswc / total * 100, 1) if total else 0.0,
     }
+
+
+@router.get("/submission-history")
+async def get_submission_history(
+    weeks: int = Query(12, ge=1, le=52, description="Number of ISO weeks to return"),
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+):
+    """
+    Return a 12-week (default) sliding window of weekly submission activity
+    for this org.
+
+    Each entry represents one ISO week, whether or not a scan was submitted
+    that week — missing weeks are filled with zeros so the calendar grid is
+    always fully populated.
+
+    Returns:
+      weeks: list of {
+        iso_year, iso_week, week_start (YYYY-MM-DD, always Monday),
+        release_count, scan_count, critical_count, warning_count
+      }
+    """
+    today = date.today()
+    # Build the list of (iso_year, iso_week, week_start) for the last N weeks
+    week_starts: list[tuple[int, int, date]] = []
+    for i in range(weeks - 1, -1, -1):
+        d = today - timedelta(weeks=i)
+        cal = d.isocalendar()
+        monday = d - timedelta(days=d.weekday())
+        week_starts.append((cal[0], cal[1], monday))
+
+    # Pull existing rows from DB
+    rows = await db.execute(
+        text("""
+            SELECT iso_year, iso_week, week_start::date,
+                   release_count, scan_count, critical_count, warning_count
+            FROM weekly_submissions
+            WHERE org_id = :org_id
+              AND week_start >= :since
+            ORDER BY week_start ASC
+        """),
+        {
+            "org_id": str(org.id),
+            "since":  week_starts[0][2].isoformat(),
+        },
+    )
+    db_rows = {
+        (int(r["iso_year"]), int(r["iso_week"])): r
+        for r in rows.mappings().all()
+    }
+
+    result = []
+    for iso_year, iso_week, monday in week_starts:
+        row = db_rows.get((iso_year, iso_week))
+        result.append({
+            "iso_year":      iso_year,
+            "iso_week":      iso_week,
+            "week_start":    monday.isoformat(),
+            "release_count": int(row["release_count"]) if row else 0,
+            "scan_count":    int(row["scan_count"])    if row else 0,
+            "critical_count": int(row["critical_count"]) if row else 0,
+            "warning_count": int(row["warning_count"]) if row else 0,
+        })
+
+    return {"weeks": result}

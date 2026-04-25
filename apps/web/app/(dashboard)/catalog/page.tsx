@@ -56,6 +56,20 @@ interface Coverage {
   iswc_pct: number;
 }
 
+interface WeekEntry {
+  iso_year: number;
+  iso_week: number;
+  week_start: string;  // YYYY-MM-DD
+  release_count: number;
+  scan_count: number;
+  critical_count: number;
+  warning_count: number;
+}
+
+interface SubmissionHistory {
+  weeks: WeekEntry[];
+}
+
 interface PaginatedConflicts {
   data: EANConflict[];
   total: number;
@@ -340,6 +354,85 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+// ── Submission calendar ───────────────────────────────────────────────────────
+
+function SubmissionCalendar({ weeks }: { weeks: WeekEntry[] }) {
+  const maxReleases = Math.max(...weeks.map(w => w.release_count), 1);
+
+  function cellColor(w: WeekEntry): string {
+    if (w.scan_count === 0) return "bg-slate-100 border-slate-200";
+    if (w.critical_count > 0) return "bg-red-200 border-red-300";
+    if (w.warning_count > 0)  return "bg-amber-200 border-amber-300";
+    return "bg-emerald-200 border-emerald-300";
+  }
+
+  function cellOpacity(w: WeekEntry): number {
+    if (w.scan_count === 0) return 1;
+    return 0.4 + 0.6 * (w.release_count / maxReleases);
+  }
+
+  function fmtWeekStart(iso: string): string {
+    const d = new Date(iso + "T00:00:00");
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  return (
+    <div className="space-y-3">
+      <h2 className="text-sm font-semibold text-slate-800">12-Week Submission Activity</h2>
+      <div className="grid grid-cols-6 gap-2 sm:grid-cols-12">
+        {weeks.map((w) => (
+          <div key={`${w.iso_year}-${w.iso_week}`} className="group relative">
+            <div
+              className={cn(
+                "h-12 w-full rounded-md border transition-all",
+                cellColor(w),
+              )}
+              style={{ opacity: cellOpacity(w) }}
+            />
+            {/* Tooltip */}
+            <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 min-w-[130px] rounded-lg border border-slate-200 bg-white p-2.5 shadow-lg text-xs group-hover:block">
+              <p className="font-semibold text-slate-700">W{w.iso_week} · {fmtWeekStart(w.week_start)}</p>
+              {w.scan_count === 0 ? (
+                <p className="mt-1 text-slate-400">No submissions</p>
+              ) : (
+                <>
+                  <p className="mt-1 text-slate-600">{w.scan_count} scan{w.scan_count !== 1 ? "s" : ""}</p>
+                  <p className="text-slate-600">{w.release_count} release{w.release_count !== 1 ? "s" : ""}</p>
+                  {w.critical_count > 0 && (
+                    <p className="text-red-600">{w.critical_count} critical</p>
+                  )}
+                  {w.warning_count > 0 && (
+                    <p className="text-amber-600">{w.warning_count} warning{w.warning_count !== 1 ? "s" : ""}</p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Legend */}
+      <div className="flex items-center gap-4 pt-1">
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <div className="h-3 w-3 rounded-sm bg-slate-100 border border-slate-200" />
+          No activity
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <div className="h-3 w-3 rounded-sm bg-emerald-200 border border-emerald-300" />
+          Clean
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <div className="h-3 w-3 rounded-sm bg-amber-200 border border-amber-300" />
+          Warnings
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <div className="h-3 w-3 rounded-sm bg-red-200 border border-red-300" />
+          Critical issues
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function CatalogPage() {
@@ -351,6 +444,7 @@ export default function CatalogPage() {
   const [conflictData, setConflictData] = useState<PaginatedConflicts | null>(null);
   const [variantData, setVariantData]   = useState<PaginatedVariants | null>(null);
   const [coverage, setCoverage]       = useState<Coverage | null>(null);
+  const [submissionHistory, setSubmissionHistory] = useState<SubmissionHistory | null>(null);
   const [error, setError]             = useState<string | null>(null);
 
   // Pagination state
@@ -399,20 +493,22 @@ export default function CatalogPage() {
     const headers = { Authorization: `Bearer ${tok}` };
 
     try {
-      const [statsRes, conflictsRes, variantsRes, coverageRes] = await Promise.all([
+      const [statsRes, conflictsRes, variantsRes, coverageRes, historyRes] = await Promise.all([
         fetch(`${API}/catalog/stats`,                                                  { headers }),
         fetch(`${API}/catalog/conflicts?page=1&per_page=${PER_PAGE}`,                 { headers }),
         fetch(`${API}/catalog/artist-variants?page=1&per_page=${PER_PAGE}`,           { headers }),
         fetch(`${API}/catalog/coverage`,                                               { headers }),
+        fetch(`${API}/catalog/submission-history?weeks=12`,                            { headers }),
       ]);
 
       if (!statsRes.ok) throw new Error("Failed to load catalog stats");
 
-      const [s, c, v, cov] = await Promise.all([
+      const [s, c, v, cov, hist] = await Promise.all([
         statsRes.json(),
         conflictsRes.json(),
         variantsRes.json(),
         coverageRes.json(),
+        historyRes.ok ? historyRes.json() : Promise.resolve(null),
       ]);
 
       setStats(s);
@@ -421,6 +517,7 @@ export default function CatalogPage() {
       setVariantData(v);
       setVariantPage(1);
       setCoverage(cov);
+      if (hist) setSubmissionHistory(hist);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -516,6 +613,13 @@ export default function CatalogPage() {
           color={stats?.artist_variants ? "amber" : "emerald"}
         />
       </div>
+
+      {/* Submission calendar */}
+      {submissionHistory && submissionHistory.weeks.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <SubmissionCalendar weeks={submissionHistory.weeks} />
+        </div>
+      )}
 
       {isEmpty && (
         <EmptyState message="No catalog data yet. Run a bulk registration scan to start building your catalog index." />

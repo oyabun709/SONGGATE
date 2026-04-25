@@ -22,7 +22,7 @@ import re
 import unicodedata
 import uuid
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import text
@@ -374,3 +374,60 @@ async def check_cross_catalog_conflicts(
             ))
 
     return issues
+
+
+# ── Weekly submission tracking ────────────────────────────────────────────────
+
+async def record_weekly_submission(
+    db: AsyncSession,
+    org_id: str,
+    release_count: int,
+    critical_count: int,
+    warning_count: int,
+    week_date: date | None = None,
+) -> None:
+    """
+    Upsert a weekly_submissions row for the ISO week containing `week_date`
+    (defaults to today).
+
+    On conflict (same org + ISO week), increments the counters rather than
+    overwriting, so multiple scans in the same week accumulate correctly.
+    """
+    target = week_date or date.today()
+    # Monday of the ISO week
+    iso_cal = target.isocalendar()
+    iso_year = iso_cal[0]
+    iso_week = iso_cal[1]
+    week_start = target - __import__("datetime").timedelta(days=target.weekday())
+    now = datetime.now(timezone.utc).isoformat()
+
+    await db.execute(
+        text("""
+            INSERT INTO weekly_submissions
+                (id, org_id, week_start, iso_year, iso_week,
+                 release_count, scan_count, critical_count, warning_count,
+                 created_at, updated_at)
+            VALUES
+                (gen_random_uuid(), :org_id, :week_start, :iso_year, :iso_week,
+                 :release_count, 1, :critical_count, :warning_count,
+                 :now, :now)
+            ON CONFLICT (org_id, iso_year, iso_week)
+            DO UPDATE SET
+                release_count  = weekly_submissions.release_count  + EXCLUDED.release_count,
+                scan_count     = weekly_submissions.scan_count     + 1,
+                critical_count = weekly_submissions.critical_count + EXCLUDED.critical_count,
+                warning_count  = weekly_submissions.warning_count  + EXCLUDED.warning_count,
+                updated_at     = EXCLUDED.updated_at
+        """),
+        {
+            "org_id":         org_id,
+            "week_start":     week_start.isoformat(),
+            "iso_year":       iso_year,
+            "iso_week":       iso_week,
+            "release_count":  release_count,
+            "critical_count": critical_count,
+            "warning_count":  warning_count,
+            "now":            now,
+        },
+    )
+    await db.commit()
