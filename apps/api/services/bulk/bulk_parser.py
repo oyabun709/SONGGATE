@@ -216,19 +216,33 @@ def parse_bulk_file(content: bytes) -> list[ParsedRelease]:
     return releases
 
 
+def _find_mmddyy_idx(parts: list[str]) -> int | None:
+    """
+    Return the index of the first part that looks like a valid MMDDYY date
+    (exactly 6 digits with 01≤MM≤12 and 01≤DD≤31).
+    """
+    for i, p in enumerate(parts):
+        p = p.strip()
+        if len(p) == 6 and p.isdigit():
+            mm, dd = int(p[:2]), int(p[2:4])
+            if 1 <= mm <= 12 and 1 <= dd <= 31:
+                return i
+    return None
+
+
 def extract_text_from_pdf(pdf_bytes: bytes) -> bytes:
     """
     Extract text content from a PDF and return as pipe-delimited UTF-8 bytes.
 
     Strategy:
       1. Use pypdf layout-extraction mode to preserve column spacing.
-      2. If the extracted text already contains pipe or comma delimiters (≥3
-         per line), return it as-is — the main parser handles those natively.
-      3. Otherwise, reconstruct columns by splitting each data line on runs of
-         2+ spaces (layout mode uses blank space to represent visual column gaps).
-         Lines that start with a 13-digit EAN are treated as data rows; anything
-         else is kept verbatim (header rows, blank lines, etc.).
-      4. Reassemble as pipe-delimited text so the main parser reads it correctly.
+      2. If the extracted text already has pipe or comma delimiters (≥3 per
+         first data line), return it unchanged — the main parser handles those.
+      3. Otherwise reconstruct columns for EAN-starting rows:
+         a. Split the rest of the line on 2+ spaces to get candidate parts.
+         b. Find the MMDDYY date field (6 digits, valid MM/DD) — use it as an
+            anchor to correctly assign artist, title, and post-date columns.
+         c. Emit as pipe-delimited so the main parser reads it correctly.
 
     Raises ImportError if pypdf is not installed.
     Raises ValueError if no extractable or parseable text is found.
@@ -260,28 +274,58 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> bytes:
     if non_empty:
         sample = non_empty[0]
         if sample.count("|") >= 3 or sample.count(",") >= 3:
-            # Already structured — return as-is
             return full_text.encode("utf-8")
 
-    # No delimiters found — reconstruct columns from layout spacing.
-    # Data rows start with a 13-digit EAN; split them on 2+ spaces.
-    _EAN_ROW = re.compile(r"^\d{13}")
+    # No delimiters — reconstruct columns for EAN-starting rows.
+    _EAN_PREFIX = re.compile(r"^(\d{13})\s*(.*)")
     pipe_lines: list[str] = []
+
     for line in full_text.splitlines():
         stripped = line.strip()
         if not stripped:
             continue
-        if _EAN_ROW.match(stripped):
-            cols = re.split(r" {2,}", stripped)
-            pipe_lines.append("|".join(c.strip() for c in cols))
-        else:
+
+        m = _EAN_PREFIX.match(stripped)
+        if not m:
             # Header row or non-data line — pass through unchanged
             pipe_lines.append(stripped)
+            continue
+
+        ean  = m.group(1)
+        rest = m.group(2).strip()
+
+        # Split the remainder on 2+ consecutive spaces
+        parts = re.split(r" {2,}", rest)
+        parts = [p.strip() for p in parts if p.strip()]
+
+        # Anchor on the MMDDYY date field
+        date_idx = _find_mmddyy_idx(parts)
+
+        if date_idx is not None and date_idx >= 1:
+            pre_date  = parts[:date_idx]   # [artist, title?, ...]
+            date_val  = parts[date_idx]
+            post_date = parts[date_idx + 1:]
+
+            if len(pre_date) == 0:
+                artist, title = "", ""
+            elif len(pre_date) == 1:
+                # Artist and title couldn't be separated — put all in artist
+                artist, title = pre_date[0], ""
+            else:
+                artist = pre_date[0]
+                title  = " ".join(pre_date[1:])
+
+            row = [ean, artist, title, date_val] + post_date
+        else:
+            # No valid MMDDYY found — fall back to position-based
+            row = [ean] + parts
+
+        pipe_lines.append("|".join(row))
 
     if not pipe_lines:
         raise ValueError(
             "Could not extract structured data from this PDF. "
-            "Please export the bulk registration file as a pipe-delimited .txt or .csv instead."
+            "Please export the bulk registration file as pipe-delimited .txt or .csv instead."
         )
 
     return "\n".join(pipe_lines).encode("utf-8")
