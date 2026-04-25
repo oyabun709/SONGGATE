@@ -547,6 +547,14 @@ export default function OnboardingPage() {
       </div>
 
       <div className="mx-auto w-full max-w-lg flex-1 px-6 py-12">
+        {/* Welcome header */}
+        <div className="mb-10 text-center">
+          <h1 className="text-2xl font-bold text-slate-900">Welcome to SONGGATE</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Pre-delivery release intelligence for music operations. Select your role to get started.
+          </p>
+        </div>
+
         {/* Stepper */}
         <div className="mb-10 flex items-center gap-0">
           {STEPS.map((s, i) => (

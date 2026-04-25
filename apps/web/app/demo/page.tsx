@@ -636,6 +636,7 @@ export default function DemoPage() {
   const [devtoolsNotice, setDevtoolsNotice] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{ name: string; content: string } | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [rateLimited, setRateLimited] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Register devtools alert + right-click protection
@@ -668,11 +669,11 @@ export default function DemoPage() {
     fmt: string = "xml",
   ) {
     const completed = new Set<string>();
+    const prevPhase = phase; // capture before changing
     setCompleted(new Set());
-    setScanResult(null);
-    setBulkResult(null);
-    setIsrcResult(null);
+    // Don't clear results here — keep them available if we need to restore on rate-limit
     setScanFormat(fmt);
+    setRateLimited(false);
     setPhase("scanning");
 
     let result: DemoScan | BulkDemoScan | ISRCDemoScan | null = null;
@@ -695,10 +696,30 @@ export default function DemoPage() {
     }
 
     if (fetchError) {
-      setScanError(fetchError);
-      setPhase("hero");
+      const isRateLimit = /rate.?limit/i.test(fetchError);
+      const hadResults = prevPhase === "results" || prevPhase === "bulk_results" || prevPhase === "isrc_results";
+      if (isRateLimit && hadResults) {
+        // Keep showing the last result with a soft rate-limit banner
+        setRateLimited(true);
+        setPhase(prevPhase);
+      } else {
+        setScanError(
+          isRateLimit
+            ? "Demo scan limit reached for this hour. Sign up for unlimited access."
+            : fetchError
+        );
+        setScanResult(null);
+        setBulkResult(null);
+        setIsrcResult(null);
+        setPhase("hero");
+      }
       return;
     }
+
+    // Success — clear old results then set new ones
+    setScanResult(null);
+    setBulkResult(null);
+    setIsrcResult(null);
 
     if (result) {
       if (fmt === "bulk") {
@@ -713,6 +734,9 @@ export default function DemoPage() {
       }
     } else {
       setScanError("Scan timed out. Please try again.");
+      setScanResult(null);
+      setBulkResult(null);
+      setIsrcResult(null);
       setPhase("hero");
     }
   }
@@ -1081,6 +1105,20 @@ export default function DemoPage() {
       {/* ── BULK RESULTS ─────────────────────────────────────────────────── */}
       {phase === "bulk_results" && bulkResult && (
         <div data-demo-results>
+          {/* Rate limit banner */}
+          {rateLimited && (
+            <div className="border-b border-amber-200 bg-amber-50 px-6 py-4">
+              <div className="mx-auto max-w-4xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">You&apos;ve used your demo scans for this hour.</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Sign up for unlimited access — your first 5 scans are free.</p>
+                </div>
+                <Link href="/sign-up" className="shrink-0 flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors">
+                  Start free trial <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+          )}
           {/* Watermark banner */}
           <div className="border-b border-dashed border-indigo-200 bg-indigo-50 py-2 text-center text-xs font-semibold text-indigo-600 tracking-wide">
             SONGGATE Confidential Demo — Bulk Registration Scan · songgate.io
@@ -1377,7 +1415,7 @@ export default function DemoPage() {
                 Ready to pre-flight your catalog?
               </h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-slate-500">
-                Catch EAN errors, duplicates, and missing metadata before they reach Luminate.
+                Catch EAN errors, duplicates, and missing metadata before they reach DSPs or downstream rights systems.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
@@ -1403,6 +1441,20 @@ export default function DemoPage() {
       {/* ── ISRC RESULTS ─────────────────────────────────────────────────── */}
       {phase === "isrc_results" && isrcResult && (
         <div data-demo-results>
+          {/* Rate limit banner */}
+          {rateLimited && (
+            <div className="border-b border-amber-200 bg-amber-50 px-6 py-4">
+              <div className="mx-auto max-w-4xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">You&apos;ve used your demo scans for this hour.</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Sign up for unlimited access — your first 5 scans are free.</p>
+                </div>
+                <Link href="/sign-up" className="shrink-0 flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors">
+                  Start free trial <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+          )}
           <div className="border-b border-dashed border-indigo-200 bg-indigo-50 py-2 text-center text-xs font-semibold text-indigo-600 tracking-wide">
             SONGGATE Confidential Demo — ISRC Reference File Scan · songgate.io
           </div>
@@ -1589,7 +1641,7 @@ export default function DemoPage() {
                 Ready to pre-flight your catalog?
               </h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-slate-500">
-                Catch ISRC errors, duplicates, and missing metadata before Luminate submission.
+                Catch ISRC errors, duplicates, and missing metadata before they reach DSPs or downstream rights systems.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
@@ -1615,6 +1667,20 @@ export default function DemoPage() {
       {/* ── RESULTS ──────────────────────────────────────────────────────── */}
       {phase === "results" && scanResult && (
         <div data-demo-results>
+          {/* Rate limit banner */}
+          {rateLimited && (
+            <div className="border-b border-amber-200 bg-amber-50 px-6 py-4">
+              <div className="mx-auto max-w-4xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-amber-800">You&apos;ve used your demo scans for this hour.</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Sign up for unlimited access — your first 5 scans are free.</p>
+                </div>
+                <Link href="/sign-up" className="shrink-0 flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors">
+                  Start free trial <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+          )}
           {/* Watermark banner */}
           <div className="border-b border-dashed border-indigo-200 bg-indigo-50 py-2 text-center text-xs font-semibold text-indigo-600 tracking-wide">
             SONGGATE Confidential Demo — Not for redistribution · songgate.io
