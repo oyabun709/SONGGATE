@@ -65,15 +65,27 @@ JSON = MetadataFormat(
     standard_supported=True,
 )
 
+BULK_REGISTRATION = MetadataFormat(
+    display_label="Bulk Registration File (EAN)",
+    internal_key="bulk_registration",
+    mime_types=("text/plain", "text/csv", "application/pdf"),
+    file_extensions=(".txt", ".csv", ".pdf"),
+    input_supported=True,
+    output_supported=False,
+    display_order=4,
+    demo_supported=True,
+    standard_supported=True,
+)
+
 # Ordered list — DDEX always first
 ALL_FORMATS: list[MetadataFormat] = sorted(
-    [DDEX_XML, CSV, JSON],
+    [DDEX_XML, CSV, JSON, BULK_REGISTRATION],
     key=lambda f: f.display_order,
 )
 
 # Canonical UI copy — use this everywhere formats are mentioned
 FORMAT_DISPLAY_STRING = (
-    "Work with three supported formats: DDEX XML, CSV, and JSON."
+    "Work with four supported formats: DDEX XML, Bulk Registration (EAN), CSV, and JSON."
 )
 
 # Extensions accepted in demo mode (metadata only, no audio/artwork)

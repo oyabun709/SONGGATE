@@ -36,6 +36,9 @@ from services.ddex.csv_parser import CSVParser
 from services.ddex.json_parser import JSONParser
 from services.fraud.screener import FraudScreener, VelocityContext
 from services.metadata.rules_engine import DSPRulesEngine, ReleaseMetadata
+from services.bulk.bulk_parser import parse_bulk_file, extract_text_from_pdf
+from services.bulk.bulk_validator import validate_bulk_file
+from services.bulk.bulk_scorer import score_bulk_scan
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +91,8 @@ def _client_ip(request: Request) -> str:
 
 # ── Sample release (embedded) ─────────────────────────────────────────────────
 
-_SAMPLE_XML_PATH = Path(__file__).parent.parent / "docs" / "ddex" / "demo-release-with-errors.xml"
+_SAMPLE_XML_PATH  = Path(__file__).parent.parent / "docs" / "ddex" / "demo-release-with-errors.xml"
+_SAMPLE_BULK_PATH = Path(__file__).parent.parent / "data" / "sample_bulk_registration.txt"
 
 def _load_sample_xml() -> bytes:
     if _SAMPLE_XML_PATH.exists():
@@ -755,6 +759,100 @@ async def demo_pdf(body: dict = Body(...)) -> Response:
     except Exception as exc:
         logger.exception("demo_pdf error: %s", exc)
         raise HTTPException(status_code=500, detail="Failed to generate PDF report.")
+
+
+def _run_bulk_scan(content: bytes, filename: str = "") -> dict[str, Any]:
+    """
+    Run the bulk registration scan pipeline entirely in memory.
+    No database access, no file storage.
+    Returns a dict suitable for the demo bulk scan response.
+    """
+    from datetime import date
+
+    scan_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Handle PDF extraction
+    if filename.lower().endswith(".pdf"):
+        try:
+            content = extract_text_from_pdf(content)
+        except (ImportError, ValueError) as exc:
+            return {
+                "scan_id": scan_id,
+                "demo": True,
+                "format": "bulk_registration",
+                "error": str(exc),
+                "status": "failed",
+                "completed_at": now,
+            }
+
+    # Parse → validate → score
+    releases = parse_bulk_file(content)
+    issues   = validate_bulk_file(releases, today=date.today())
+    result   = score_bulk_scan(releases, issues)
+
+    return {
+        "scan_id": scan_id,
+        "demo": True,
+        "format": "bulk_registration",
+        "watermark": "SONGGATE Demo — songgate.io",
+        "status": "complete",
+        "readiness_score": result["score"],
+        "grade": result["grade"],
+        "total_releases": result["total_releases"],
+        "releases_with_issues": result["releases_with_issues"],
+        "critical_count": result["critical_count"],
+        "warning_count": result["warning_count"],
+        "info_count": result["info_count"],
+        "total_issues": result["total_issues"],
+        "cross_release_issues": result["cross_release_issues"],
+        "per_release_issues": result["per_release_issues"],
+        "completed_at": now,
+    }
+
+
+@router.post("/bulk")
+async def demo_bulk_scan(
+    request: Request,
+    file: UploadFile | None = File(default=None),
+) -> JSONResponse:
+    """
+    Run a demo bulk registration file scan.
+
+    Send a multipart/form-data request with field ``file`` containing a
+    pipe-delimited, CSV, or PDF bulk registration file.
+    Omit the field to use the embedded sample file (Luminate RSD 2026 data).
+
+    Returns bulk scan results including per-release and cross-release issues.
+    Rate limited same as /api/demo/scan.
+    """
+    ip = _client_ip(request)
+    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:8]
+    _check_rate_limit(ip)
+
+    if file is not None:
+        content = await file.read()
+        if len(content) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File too large (max 5 MB).")
+        filename = file.filename or ""
+    else:
+        if _SAMPLE_BULK_PATH.exists():
+            content = _SAMPLE_BULK_PATH.read_bytes()
+        else:
+            content = b"EAN|Artist|Title|Release Date|Imprint|Label|NARM Config\n"
+        filename = "sample_bulk_registration.txt"
+
+    result = _run_bulk_scan(content, filename=filename)
+
+    logger.info(
+        "demo_bulk ip_hash=%s grade=%s releases=%d issues=%d",
+        ip_hash,
+        result.get("grade", "?"),
+        result.get("total_releases", 0),
+        result.get("total_issues", 0),
+    )
+
+    return JSONResponse(content=result)
 
 
 @router.get("/sample-xml")

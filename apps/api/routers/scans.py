@@ -19,8 +19,8 @@ from datetime import datetime, timezone, timedelta
 import io
 import re
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, UploadFile, File, status
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,6 +113,128 @@ async def create_scan(
     )
 
     return scan
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# POST /scans/bulk — bulk registration file scan (authenticated, stored in DB)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post("/scans/bulk", status_code=status.HTTP_200_OK)
+async def create_bulk_scan(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    org: Organization = Depends(get_current_org),
+) -> JSONResponse:
+    """
+    Scan a bulk registration file (pipe-delimited, CSV, or PDF).
+
+    Accepts .txt, .csv, .pdf files up to 5 MB.
+    Runs parser → validator → scorer entirely in-process.
+
+    The scan result is persisted as a Release + Scan + ScanResults in the database,
+    scoped to the authenticated org, so it appears in scan history.
+
+    Returns the full bulk scan result immediately (synchronous — no polling needed).
+    """
+    from datetime import date, timezone as tz
+    from services.bulk.bulk_parser import parse_bulk_file, extract_text_from_pdf
+    from services.bulk.bulk_validator import validate_bulk_file
+    from services.bulk.bulk_scorer import score_bulk_scan
+    from models.release import Release, SubmissionFormat, ReleaseStatus
+    from models.scan import Scan, ScanStatus, ScanGrade
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large (max 5 MB).")
+
+    filename = file.filename or "bulk_registration.txt"
+
+    # Handle PDF extraction
+    if filename.lower().endswith(".pdf"):
+        try:
+            content = extract_text_from_pdf(content)
+        except (ImportError, ValueError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+
+    # Enforce scan quota
+    await check_scan_limit(org)
+
+    # Parse → validate → score
+    releases    = parse_bulk_file(content)
+    issues      = validate_bulk_file(releases, today=date.today())
+    scan_result = score_bulk_scan(releases, issues)
+
+    now = datetime.now(timezone.utc)
+
+    # Build a synthetic release record to anchor the scan in DB
+    first_release = releases[0] if releases else None
+    release_title  = filename.removesuffix(".txt").removesuffix(".csv").removesuffix(".pdf")
+    release_artist = first_release.artist if first_release else "Various Artists"
+    release_upc    = first_release.ean if first_release else None
+
+    db_release = Release(
+        id=uuid.uuid4(),
+        org_id=org.id,
+        title=f"Bulk: {release_title}",
+        artist=release_artist,
+        upc=release_upc,
+        submission_format=SubmissionFormat.BULK_REGISTRATION,
+        status=ReleaseStatus.complete,
+        metadata_={
+            "bulk_registration": True,
+            "total_releases": scan_result["total_releases"],
+            "filename": filename,
+        },
+        created_at=now,
+    )
+    db.add(db_release)
+    await db.flush()
+
+    grade_enum = ScanGrade(scan_result["grade"])
+    db_scan = Scan(
+        id=uuid.uuid4(),
+        release_id=db_release.id,
+        org_id=org.id,
+        status=ScanStatus.complete,
+        readiness_score=scan_result["score"],
+        grade=grade_enum,
+        total_issues=scan_result["total_issues"],
+        critical_count=scan_result["critical_count"],
+        warning_count=scan_result["warning_count"],
+        info_count=scan_result["info_count"],
+        layers_run=["bulk_registration"],
+        started_at=now,
+        completed_at=now,
+        created_at=now,
+    )
+    # Store bulk result in validated_fields — avoids FK constraint on rules.id
+    # (ScanResult rows require rule_id to exist in the rules table)
+    db_scan.validated_fields = {
+        "bulk_registration": True,
+        "cross_release_issues": scan_result["cross_release_issues"],
+        "per_release_issues": scan_result["per_release_issues"],
+    }
+    db.add(db_scan)
+
+    await db.commit()
+
+    return JSONResponse(content={
+        "scan_id": str(db_scan.id),
+        "release_id": str(db_release.id),
+        "format": "bulk_registration",
+        "status": "complete",
+        "readiness_score": scan_result["score"],
+        "grade": scan_result["grade"],
+        "total_releases": scan_result["total_releases"],
+        "releases_with_issues": scan_result["releases_with_issues"],
+        "critical_count": scan_result["critical_count"],
+        "warning_count": scan_result["warning_count"],
+        "info_count": scan_result["info_count"],
+        "total_issues": scan_result["total_issues"],
+        "cross_release_issues": scan_result["cross_release_issues"],
+        "per_release_issues": scan_result["per_release_issues"],
+        "completed_at": now.isoformat(),
+    })
 
 
 async def _run_scan_background(

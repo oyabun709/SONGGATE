@@ -14,6 +14,7 @@ class SubmissionFormat(str, enum.Enum):
     DDEX_ERN_42 = "DDEX_ERN_42"
     CSV = "CSV"
     JSON = "JSON"
+    BULK_REGISTRATION = "BULK_REGISTRATION"
 
 
 class ReleaseStatus(str, enum.Enum):

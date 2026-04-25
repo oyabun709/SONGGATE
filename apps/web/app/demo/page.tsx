@@ -59,21 +59,75 @@ interface DemoScan {
   completed_at: string;
 }
 
+// Bulk registration types
+interface BulkIssue {
+  id: string;
+  severity: "critical" | "warning" | "info";
+  rule_name: string;
+  message: string;
+  fix_hint: string;
+  affected_ean?: string | null;
+  affected_rows?: number[];
+}
+
+interface BulkPerReleaseEntry {
+  row_number: number;
+  ean: string;
+  artist: string;
+  title: string;
+  issues: Array<{
+    id: string;
+    severity: string;
+    rule_name: string;
+    message: string;
+    fix_hint: string;
+  }>;
+}
+
+interface BulkDemoScan {
+  scan_id: string;
+  demo: boolean;
+  format: "bulk_registration";
+  watermark: string;
+  status: string;
+  readiness_score: number;
+  grade: "PASS" | "WARN" | "FAIL";
+  total_releases: number;
+  releases_with_issues: number;
+  critical_count: number;
+  warning_count: number;
+  info_count: number;
+  total_issues: number;
+  cross_release_issues: BulkIssue[];
+  per_release_issues: BulkPerReleaseEntry[];
+  completed_at: string;
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const FORMAT_STEP_LABEL: Record<string, string> = {
   csv:  "CSV Validation",
   json: "JSON Validation",
   xml:  "DDEX Validation",
+  bulk: "EAN Format Validation",
 };
 
 const FORMAT_LAYER_LABEL: Record<string, string> = {
   csv:  "CSV / Format",
   json: "JSON / Format",
   xml:  "DDEX / Format",
+  bulk: "EAN Validation",
 };
 
 function getLayerSteps(fmt: string) {
+  if (fmt === "bulk") {
+    return [
+      { key: "ean",         label: "EAN Format Validation",         duration: 700 },
+      { key: "per_release", label: "Per-Release Field Checks",      duration: 900 },
+      { key: "cross",       label: "Cross-Release Analysis",        duration: 1000 },
+      { key: "scoring",     label: "Scoring & Report Generation",   duration: 600 },
+    ];
+  }
   return [
     { key: "ddex",     label: FORMAT_STEP_LABEL[fmt] ?? "Format Validation", duration: 800 },
     { key: "metadata", label: "DSP Metadata Rules",                           duration: 900 },
@@ -262,6 +316,120 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
+// ── Bulk issue cards ──────────────────────────────────────────────────────────
+
+function BulkCrossIssueCard({ issue }: { issue: BulkIssue }) {
+  const [expanded, setExpanded] = useState(false);
+  const isCritical = issue.severity === "critical";
+  return (
+    <div className={cn(
+      "rounded-lg border transition-shadow hover:shadow-sm",
+      isCritical ? "border-red-200 bg-red-50" : "border-amber-100 bg-amber-50/40",
+    )}>
+      <div
+        className="flex cursor-pointer items-start gap-3 p-4"
+        onClick={() => setExpanded(e => !e)}
+      >
+        <div className="mt-0.5 shrink-0">
+          {isCritical
+            ? <AlertTriangle className="h-4 w-4 text-red-500" />
+            : issue.severity === "warning"
+            ? <AlertTriangle className="h-4 w-4 text-amber-500" />
+            : <Info className="h-4 w-4 text-blue-500" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-4">
+            <p className={cn("text-sm font-medium", isCritical ? "text-red-800" : "text-slate-800")}>
+              {issue.message}
+            </p>
+            <div className="flex shrink-0 items-center gap-2">
+              <SeverityBadge severity={issue.severity} />
+              {expanded
+                ? <ChevronUp className="h-4 w-4 text-slate-400" />
+                : <ChevronDown className="h-4 w-4 text-slate-400" />}
+            </div>
+          </div>
+          <p className="mt-0.5 text-xs text-slate-400">{issue.rule_name}</p>
+          {issue.affected_rows && issue.affected_rows.length > 0 && (
+            <p className="mt-1 text-xs text-slate-400">
+              Affects rows: {issue.affected_rows.join(", ")}
+            </p>
+          )}
+        </div>
+      </div>
+      {expanded && issue.fix_hint && (
+        <div className="border-t border-slate-100 bg-white/60 px-4 py-3">
+          <div className="rounded-md border border-indigo-100 bg-indigo-50 px-3 py-2.5">
+            <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-1">Fix</p>
+            <p className="text-sm text-indigo-800">{issue.fix_hint}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BulkPerReleaseCard({ entry }: { entry: BulkPerReleaseEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasCritical = entry.issues.some(i => i.severity === "critical");
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-sm">
+      <div
+        className="flex cursor-pointer items-start gap-3 p-4"
+        onClick={() => setExpanded(e => !e)}
+      >
+        <div className="mt-0.5 shrink-0">
+          {hasCritical
+            ? <AlertTriangle className="h-4 w-4 text-red-500" />
+            : <AlertTriangle className="h-4 w-4 text-amber-500" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-800">
+                Row {entry.row_number}
+                {entry.title && <span className="ml-2 font-normal text-slate-600">— {entry.title}</span>}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-400">
+                {entry.artist}
+                {entry.ean && <span className="ml-2 font-mono">{entry.ean}</span>}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                {entry.issues.length} issue{entry.issues.length !== 1 ? "s" : ""}
+              </span>
+              {expanded
+                ? <ChevronUp className="h-4 w-4 text-slate-400" />
+                : <ChevronDown className="h-4 w-4 text-slate-400" />}
+            </div>
+          </div>
+        </div>
+      </div>
+      {expanded && (
+        <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 space-y-2">
+          {entry.issues.map(issue => (
+            <div key={issue.id} className="rounded-md border border-slate-200 bg-white p-3">
+              <div className="flex items-start gap-2">
+                <SeverityBadge severity={issue.severity} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-500">{issue.rule_name}</p>
+                  <p className="text-sm text-slate-800 mt-0.5">{issue.message}</p>
+                  {issue.fix_hint && (
+                    <p className="mt-1.5 text-xs text-indigo-700 bg-indigo-50 rounded px-2 py-1">
+                      ↳ {issue.fix_hint}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Terms modal ───────────────────────────────────────────────────────────────
 
 function TermsModal({ onAccept }: { onAccept: () => void }) {
@@ -393,13 +561,14 @@ function LayerMiniBar({ label, score }: { label: string; score: number }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-type Phase = "terms" | "hero" | "scanning" | "results";
+type Phase = "terms" | "hero" | "scanning" | "results" | "bulk_results";
 
 export default function DemoPage() {
   const [phase, setPhase]         = useState<Phase>("terms");
   const [termsAccepted, setTerms] = useState(false);
   const [completedLayers, setCompleted] = useState<Set<string>>(new Set());
   const [scanResult, setScanResult]     = useState<DemoScan | null>(null);
+  const [bulkResult, setBulkResult]     = useState<BulkDemoScan | null>(null);
   const [scanError, setScanError]       = useState<string | null>(null);
   const [scanFormat, setScanFormat]     = useState<string>("xml");
   const [devtoolsNotice, setDevtoolsNotice] = useState(false);
@@ -432,14 +601,18 @@ export default function DemoPage() {
 
   // ── Animate progress layers ───────────────────────────────────────────────
 
-  async function animateLayers(scanPromise: Promise<DemoScan>, fmt: string = "xml") {
+  async function animateLayers(
+    scanPromise: Promise<DemoScan | BulkDemoScan>,
+    fmt: string = "xml",
+  ) {
     const completed = new Set<string>();
     setCompleted(new Set());
     setScanResult(null);
+    setBulkResult(null);
     setScanFormat(fmt);
     setPhase("scanning");
 
-    let result: DemoScan | null = null;
+    let result: DemoScan | BulkDemoScan | null = null;
     let fetchError: string | null = null;
 
     // Start the real scan in parallel with the animation
@@ -451,7 +624,7 @@ export default function DemoPage() {
       setCompleted(new Set(completed));
     }
 
-    // Wait a moment for results to arrive
+    // Wait for results to arrive
     const maxWait = 10_000;
     const start = Date.now();
     while (!result && !fetchError && Date.now() - start < maxWait) {
@@ -465,8 +638,13 @@ export default function DemoPage() {
     }
 
     if (result) {
-      setScanResult(result);
-      setPhase("results");
+      if (fmt === "bulk") {
+        setBulkResult(result as BulkDemoScan);
+        setPhase("bulk_results");
+      } else {
+        setScanResult(result as DemoScan);
+        setPhase("results");
+      }
     } else {
       setScanError("Scan timed out. Please try again.");
       setPhase("hero");
@@ -488,6 +666,23 @@ export default function DemoPage() {
         return res.json() as Promise<DemoScan>;
       });
     await animateLayers(promise, "xml");
+  }
+
+  // ── Scan sample bulk registration file ───────────────────────────────────
+
+  async function scanBulk() {
+    setScanError(null);
+    const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+    const promise = fetch(`${API}/api/demo/bulk`, { method: "POST" })
+      .then(async res => {
+        if (res.status === 429) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.detail?.message ?? "Rate limit reached.");
+        }
+        if (!res.ok) throw new Error("Scan failed. Please try again.");
+        return res.json() as Promise<BulkDemoScan>;
+      });
+    await animateLayers(promise, "bulk");
   }
 
   // ── Scan with uploaded file ───────────────────────────────────────────────
@@ -687,7 +882,7 @@ export default function DemoPage() {
           )}
 
           {phase === "hero" && (
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4 flex-wrap">
               <button
                 onClick={scanSample}
                 className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
@@ -702,16 +897,24 @@ export default function DemoPage() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".xml,.csv,.json"
+                  accept=".xml,.csv,.json,.txt,.pdf"
                   className="hidden"
                   onChange={handleFileUpload}
                 />
               </label>
+
+              <button
+                onClick={scanBulk}
+                className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-6 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+              >
+                <Zap className="h-4 w-4" />
+                Scan a bulk registration file
+              </button>
             </div>
           )}
 
           <p className="mt-4 text-xs text-slate-400">
-            Work with three supported formats: DDEX XML, CSV, and JSON. Your files are not stored.
+            Work with four supported formats: DDEX XML, Bulk Registration (EAN), CSV, and JSON. Your files are not stored.
           </p>
 
           {/* Scanning animation */}
@@ -727,6 +930,191 @@ export default function DemoPage() {
             </div>
           )}
         </section>
+      )}
+
+      {/* ── BULK RESULTS ─────────────────────────────────────────────────── */}
+      {phase === "bulk_results" && bulkResult && (
+        <div data-demo-results>
+          {/* Watermark banner */}
+          <div className="border-b border-dashed border-indigo-200 bg-indigo-50 py-2 text-center text-xs font-semibold text-indigo-600 tracking-wide">
+            SONGGATE Confidential Demo — Bulk Registration Scan · songgate.io
+          </div>
+
+          <div className="mx-auto max-w-4xl space-y-8 px-6 py-10">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h1 className="text-2xl font-semibold text-slate-900">
+                  Bulk Registration Scan
+                  <span className="ml-2 text-lg font-normal text-slate-500">
+                    — {bulkResult.total_releases} releases
+                  </span>
+                </h1>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  Demo scan · Results not stored · Luminate / Distributor EAN format
+                </p>
+              </div>
+              <button
+                onClick={() => { setPhase("hero"); setBulkResult(null); }}
+                className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                ← New scan
+              </button>
+            </div>
+
+            {/* Score + stats */}
+            <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="flex flex-col items-center gap-10 md:flex-row md:items-start">
+                <div className="shrink-0 flex flex-col items-center gap-4">
+                  <ScoreCircle score={bulkResult.readiness_score} grade={bulkResult.grade} />
+                  <div className="flex items-center gap-4 text-center">
+                    <div>
+                      <p className="text-2xl font-bold text-red-600 tabular-nums">{bulkResult.critical_count}</p>
+                      <p className="text-xs text-slate-400">Critical</p>
+                    </div>
+                    <div className="h-8 w-px bg-slate-100" />
+                    <div>
+                      <p className="text-2xl font-bold text-amber-500 tabular-nums">{bulkResult.warning_count}</p>
+                      <p className="text-xs text-slate-400">Warnings</p>
+                    </div>
+                    <div className="h-8 w-px bg-slate-100" />
+                    <div>
+                      <p className="text-2xl font-bold text-slate-400 tabular-nums">{bulkResult.info_count}</p>
+                      <p className="text-xs text-slate-400">Info</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 w-full space-y-5">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-800">Catalog Summary</h2>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      Scanned {bulkResult.total_releases} releases across the bulk registration file.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                      <p className="text-2xl font-bold text-slate-800 tabular-nums">{bulkResult.total_releases}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Total releases</p>
+                    </div>
+                    <div className={cn(
+                      "rounded-lg border px-4 py-3",
+                      bulkResult.releases_with_issues > 0
+                        ? "border-red-100 bg-red-50"
+                        : "border-emerald-100 bg-emerald-50",
+                    )}>
+                      <p className={cn(
+                        "text-2xl font-bold tabular-nums",
+                        bulkResult.releases_with_issues > 0 ? "text-red-600" : "text-emerald-600",
+                      )}>
+                        {bulkResult.releases_with_issues}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">Releases with issues</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                      <p className="text-2xl font-bold text-slate-800 tabular-nums">{bulkResult.cross_release_issues.length}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Cross-release issues</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+                      <p className="text-2xl font-bold text-slate-800 tabular-nums">
+                        {bulkResult.per_release_issues.reduce((acc, r) => acc + r.issues.length, 0)}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">Per-release issues</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Cross-release issues */}
+            {bulkResult.cross_release_issues.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                    Cross-Release Issues
+                    {bulkResult.cross_release_issues.filter(i => i.severity === "critical").length > 0 && (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                        {bulkResult.cross_release_issues.filter(i => i.severity === "critical").length} critical
+                      </span>
+                    )}
+                    {bulkResult.cross_release_issues.filter(i => i.severity === "warning").length > 0 && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                        {bulkResult.cross_release_issues.filter(i => i.severity === "warning").length} warnings
+                      </span>
+                    )}
+                  </h2>
+                  <span className="text-xs text-slate-400">Duplicates, inconsistencies across the file</span>
+                </div>
+                <div className="space-y-2">
+                  {bulkResult.cross_release_issues
+                    .sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9))
+                    .map(issue => (
+                    <BulkCrossIssueCard key={issue.id} issue={issue} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Per-release issues */}
+            {bulkResult.per_release_issues.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                    Per-Release Issues
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                      {bulkResult.per_release_issues.length} releases affected
+                    </span>
+                  </h2>
+                  <span className="text-xs text-slate-400">Issues on individual rows</span>
+                </div>
+                <div className="space-y-2">
+                  {bulkResult.per_release_issues.map(entry => (
+                    <BulkPerReleaseCard key={entry.row_number} entry={entry} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All clear */}
+            {bulkResult.total_issues === 0 && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-8 text-center">
+                <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-3" />
+                <h2 className="text-base font-semibold text-emerald-800">All releases passed</h2>
+                <p className="text-xs text-emerald-600 mt-1">
+                  Every EAN, artist name, title, and date validated successfully.
+                </p>
+              </div>
+            )}
+
+            {/* CTA */}
+            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-indigo-100/50 px-8 py-10 text-center">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+                Ready to pre-flight your catalog?
+              </h2>
+              <p className="mx-auto mt-3 max-w-md text-sm text-slate-500">
+                Catch EAN errors, duplicates, and missing metadata before they reach Luminate.
+              </p>
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Link
+                  href="/sign-up"
+                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                >
+                  Start free trial <ArrowRight className="h-4 w-4" />
+                </Link>
+                <a
+                  href="mailto:andrew@housesonhills.io?subject=SONGGATE Pilot&body=Hi, I'd like to book a call to discuss a SONGGATE pilot."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  Book a pilot call
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── RESULTS ──────────────────────────────────────────────────────── */}
