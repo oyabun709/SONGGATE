@@ -138,10 +138,9 @@ const FORMAT_LAYER_LABEL: Record<string, string> = {
 function getLayerSteps(fmt: string) {
   if (fmt === "bulk") {
     return [
-      { key: "ean",         label: "EAN Format Validation",         duration: 700 },
-      { key: "per_release", label: "Per-Release Field Checks",      duration: 900 },
-      { key: "cross",       label: "Cross-Release Analysis",        duration: 1000 },
-      { key: "scoring",     label: "Scoring & Report Generation",   duration: 600 },
+      { key: "ean",         label: "EAN Validation",       duration: 700 },
+      { key: "cross",       label: "Cross-Release Analysis", duration: 900 },
+      { key: "coverage",    label: "Identifier Coverage",   duration: 800 },
     ];
   }
   return [
@@ -462,10 +461,15 @@ function TermsModal({ onAccept }: { onAccept: () => void }) {
           </div>
         </div>
 
-        <p className="mb-5 text-sm leading-relaxed text-slate-600">
+        <p className="mb-4 text-sm leading-relaxed text-slate-600">
           By using this demo you agree not to reverse engineer, replicate, or
           redistribute SONGGATE&apos;s validation methodology. This demo is provided
           for evaluation purposes only.
+        </p>
+
+        <p className="mb-5 text-sm leading-relaxed text-slate-600">
+          Bulk registration file validation is powered by SONGGATE&apos;s catalog
+          intelligence engine, built to complement Luminate Data Enrichment workflows.
         </p>
 
         <p className="mb-6 text-xs text-slate-400">
@@ -830,6 +834,57 @@ export default function DemoPage() {
     }
   }
 
+  // ── Bulk CSV/JSON export ──────────────────────────────────────────────────
+
+  function exportBulkCSV() {
+    if (!bulkResult) return;
+    const date = new Date().toISOString().slice(0, 10);
+    const rows = [
+      ["type", "severity", "rule_name", "message", "affected_ean", "affected_rows", "fix_hint"],
+      ...bulkResult.cross_release_issues.map((i) => [
+        "cross_release",
+        i.severity,
+        i.rule_name,
+        i.message,
+        i.affected_ean ?? "",
+        (i.affected_rows ?? []).join(";"),
+        i.fix_hint,
+      ]),
+      ...bulkResult.per_release_issues.flatMap((entry) =>
+        entry.issues.map((i) => [
+          "per_release",
+          i.severity,
+          i.rule_name,
+          i.message,
+          entry.ean,
+          String(entry.row_number),
+          i.fix_hint,
+        ])
+      ),
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `SONGGATE_BULK_DEMO_${date}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportBulkJSON() {
+    if (!bulkResult) return;
+    const date = new Date().toISOString().slice(0, 10);
+    const payload = {
+      ...bulkResult,
+      watermark: "SONGGATE Demo — Not for redistribution · songgate.io",
+      exported_at: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `SONGGATE_BULK_DEMO_${date}.json`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ── Results grouping ──────────────────────────────────────────────────────
 
   function groupedResults() {
@@ -924,7 +979,7 @@ export default function DemoPage() {
                 className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-6 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
               >
                 <Zap className="h-4 w-4" />
-                Scan a bulk registration file
+                Scan a bulk catalog file
               </button>
             </div>
           )}
@@ -937,7 +992,9 @@ export default function DemoPage() {
           {phase === "scanning" && (
             <div className="mt-12 mx-auto max-w-sm">
               <p className="mb-6 text-sm font-semibold text-slate-700">
-                Running your release through 4 QA layers…
+                {scanFormat === "bulk"
+                  ? "Running your catalog through 3 QA layers…"
+                  : "Running your release through 4 QA layers…"}
               </p>
               <ScanProgress completedLayers={completedLayers} fmt={scanFormat} />
               <p className="mt-4 text-xs text-slate-400">
@@ -970,12 +1027,36 @@ export default function DemoPage() {
                   Demo scan · Results not stored · Luminate / Distributor EAN format
                 </p>
               </div>
-              <button
-                onClick={() => { setPhase("hero"); setBulkResult(null); }}
-                className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-              >
-                ← New scan
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setPhase("hero"); setBulkResult(null); }}
+                  className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  ← New scan
+                </button>
+                <button
+                  onClick={exportBulkCSV}
+                  className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  <Download className="h-3 w-3" />
+                  CSV
+                </button>
+                <button
+                  onClick={exportBulkJSON}
+                  className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  <Download className="h-3 w-3" />
+                  JSON
+                </button>
+                <button
+                  disabled
+                  className="flex items-center gap-1.5 rounded-md bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-400 cursor-not-allowed"
+                  title="PDF export requires an account"
+                >
+                  <Lock className="h-3 w-3" />
+                  PDF
+                </button>
+              </div>
             </div>
 
             {/* Score + stats */}
@@ -1011,7 +1092,7 @@ export default function DemoPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
                       <p className="text-2xl font-bold text-slate-800 tabular-nums">{bulkResult.total_releases}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">Total releases</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Releases scanned</p>
                     </div>
                     <div className={cn(
                       "rounded-lg border px-4 py-3",
@@ -1029,15 +1110,23 @@ export default function DemoPage() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-                      <p className="text-2xl font-bold text-slate-800 tabular-nums">{bulkResult.cross_release_issues.length}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">Cross-release issues</p>
+                    <div className={cn(
+                      "rounded-lg border px-4 py-3",
+                      (bulkResult.identifier_coverage?.with_isni_pct ?? 0) < 50
+                        ? "border-amber-100 bg-amber-50"
+                        : "border-emerald-100 bg-emerald-50",
+                    )}>
+                      <p className={cn(
+                        "text-2xl font-bold tabular-nums",
+                        (bulkResult.identifier_coverage?.with_isni_pct ?? 0) < 50 ? "text-amber-600" : "text-emerald-600",
+                      )}>
+                        {bulkResult.identifier_coverage?.with_isni_pct ?? 0}%
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">Identifier coverage</p>
                     </div>
                     <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-                      <p className="text-2xl font-bold text-slate-800 tabular-nums">
-                        {bulkResult.per_release_issues.reduce((acc, r) => acc + r.issues.length, 0)}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">Per-release issues</p>
+                      <p className="text-2xl font-bold text-slate-800 tabular-nums">{bulkResult.cross_release_issues.length}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Cross-catalog issues</p>
                     </div>
                   </div>
                 </div>
@@ -1170,11 +1259,27 @@ export default function DemoPage() {
 
                   <p className="mt-4 text-xs text-slate-500 leading-relaxed">
                     ISNI and ISWC identifiers enable accurate artist and works matching in{" "}
-                    <span className="font-medium text-slate-700">Luminate Data Enrichment</span>.
+                    <a
+                      href="https://luminatedata.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-indigo-600 hover:underline"
+                    >
+                      Luminate Data Enrichment
+                    </a>.
                     Missing identifiers reduce downstream match rates for chart tracking, royalty routing, and DSP delivery.
                     {bulkResult.enrichment_status === "pending_api_integration" && (
-                      <span className="ml-1 text-indigo-600">
-                        Connect to Luminate ArtistMatch and WorksMatch to auto-fill missing identifiers.
+                      <span className="ml-1">
+                        {" "}Connect to{" "}
+                        <a
+                          href="https://luminatedata.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 hover:underline"
+                        >
+                          Luminate ArtistMatch and WorksMatch
+                        </a>
+                        {" "}to auto-fill missing identifiers.
                       </span>
                     )}
                   </p>

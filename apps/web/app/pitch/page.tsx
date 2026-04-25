@@ -27,6 +27,7 @@ const SLIDES = [
   "The Gap",
   "The Product",
   "Why Now",
+  "The Luminate Pipeline",
   "The Moat",
   "Business Model",
   "Who Buys This",
@@ -311,7 +312,68 @@ function Slide05WhyNow() {
   );
 }
 
-function Slide06Moat() {
+function Slide06LuminatePipeline() {
+  const pipeline = [
+    { label: "LABEL / DISTRIBUTOR", sub: "Bulk catalog submission", accent: false },
+    { label: "SONGGATE", sub: "Pre-delivery QA\nEAN validation · ISNI/ISWC checks\nDuplicate detection · Artist disambiguation", accent: true },
+    { label: "DSP DELIVERY", sub: "Spotify · Apple Music · Amazon · Tidal +10", accent: false },
+    { label: "LUMINATE CONNECT", sub: "Consumption measurement\nChart tracking · Streaming data", accent: false },
+    { label: "QUANSIC DATA ENRICHMENT", sub: "ArtistMatch (ISNI) · WorksMatch (ISWC)\nID Registration", accent: false },
+  ];
+
+  return (
+    <div className="flex flex-col h-full justify-center gap-4 sm:gap-5">
+      <div>
+        <h2 className="text-2xl sm:text-4xl font-bold text-center">The Luminate Pipeline</h2>
+        <p className="text-center text-slate-400 text-sm sm:text-base mt-1">
+          SONGGATE sits upstream of everything Luminate measures.
+        </p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-0 max-w-4xl mx-auto w-full">
+        {pipeline.map((node, i) => (
+          <div key={node.label} className="flex flex-col sm:flex-row items-center">
+            <div className={`rounded-xl border p-3 sm:p-4 text-center min-w-[140px] sm:min-w-[160px] transition-all ${
+              node.accent
+                ? "border-indigo-500 bg-indigo-950/60 shadow-lg shadow-indigo-900/40"
+                : "border-slate-800 bg-white/[0.02]"
+            }`}>
+              <div className={`text-xs sm:text-sm font-bold tracking-wide mb-1 ${node.accent ? "text-white" : "text-slate-300"}`}>
+                {node.label}
+              </div>
+              <div className="text-[10px] sm:text-xs text-slate-500 whitespace-pre-line leading-relaxed">
+                {node.sub}
+              </div>
+            </div>
+            {i < pipeline.length - 1 && (
+              <div className="flex items-center justify-center py-1 sm:py-0 sm:px-2">
+                <span className="text-slate-700 text-lg sm:text-xl rotate-90 sm:rotate-0">↓</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="max-w-2xl mx-auto w-full space-y-2 sm:space-y-3">
+        <div className="rounded-lg border border-slate-800 bg-white/[0.02] px-4 sm:px-5 py-3">
+          <p className="text-xs sm:text-sm text-slate-300 text-center leading-relaxed">
+            Clean metadata in = accurate consumption data out. SONGGATE is the quality gate
+            that makes Luminate&apos;s downstream data reliable at the source.
+          </p>
+        </div>
+        <div className="rounded-lg border px-4 sm:px-5 py-3" style={{ borderColor: `${ACCENT}44`, background: `${ACCENT}0d` }}>
+          <p className="text-xs sm:text-sm text-center leading-relaxed" style={{ color: "#a5b4fc" }}>
+            <span className="font-semibold text-white">SONGGATE is Quansic-ready:</span>{" "}
+            our bulk validation checks ISNI and ISWC format, flags missing identifiers, and
+            surfaces artist name inconsistencies before they reach the Luminate identifier matching layer.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Slide07Moat() {
   const moats = [
     {
       icon: Shield,
@@ -351,7 +413,7 @@ function Slide06Moat() {
   );
 }
 
-function Slide07BusinessModel() {
+function Slide08BusinessModel() {
   const tiers = [
     {
       name: "Starter",
@@ -419,7 +481,7 @@ function Slide07BusinessModel() {
   );
 }
 
-function Slide08WhoButsThis() {
+function Slide09WhoBuysThis() {
   const buyers = [
     {
       emoji: "🏢",
@@ -552,9 +614,10 @@ const SLIDE_COMPONENTS = [
   Slide03Gap,
   Slide04Product,
   Slide05WhyNow,
-  Slide06Moat,
-  Slide07BusinessModel,
-  Slide08WhoButsThis,
+  Slide06LuminatePipeline,
+  Slide07Moat,
+  Slide08BusinessModel,
+  Slide09WhoBuysThis,
   Slide10Ask,
 ];
 

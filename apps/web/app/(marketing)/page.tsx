@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   BarChart3,
   GitBranch,
+  Database,
   ArrowRight,
   CheckCircle2,
   XCircle,
@@ -38,6 +39,14 @@ const FEATURES = [
       "Ingest DDEX ERN 4.3 packages, CSV uploads, or JSON via the REST API. Drop it into your existing pipeline or use the dashboard.",
     color: "text-violet-600",
     bg: "bg-violet-50",
+  },
+  {
+    icon: Database,
+    title: "Bulk Catalog Validation",
+    description:
+      "Submit your entire catalog for pre-delivery QA. SONGGATE catches duplicate EANs, artist name inconsistencies, and missing identifiers across hundreds of releases — before they propagate into downstream rights systems.",
+    color: "text-indigo-600",
+    bg: "bg-indigo-50",
   },
 ];
 
@@ -107,9 +116,10 @@ export default function LandingPage() {
           <span className="text-indigo-600">metadata errors.</span>
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-lg text-slate-500">
-          Pre-flight every release before delivery. SONGGATE runs 40+ validation
-          rules across DDEX structure, metadata, artwork, and fraud
-          signals — and scores your readiness for every major DSP.
+          Pre-flight every release and every catalog submission before delivery.
+          SONGGATE runs 40+ validation rules across DDEX structure, metadata,
+          bulk EAN registration, and fraud signals — and scores your readiness
+          for every major DSP.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <button
@@ -197,7 +207,7 @@ export default function LandingPage() {
           <br />
           and the store shelf
         </h2>
-        <div className="grid gap-8 sm:grid-cols-3">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map(({ icon: Icon, title, description, color, bg }) => (
             <div key={title} className="rounded-xl border border-slate-100 p-6">
               <div
