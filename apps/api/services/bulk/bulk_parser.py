@@ -218,9 +218,20 @@ def parse_bulk_file(content: bytes) -> list[ParsedRelease]:
 
 def extract_text_from_pdf(pdf_bytes: bytes) -> bytes:
     """
-    Extract text content from a PDF and return as UTF-8 bytes.
+    Extract text content from a PDF and return as pipe-delimited UTF-8 bytes.
+
+    Strategy:
+      1. Use pypdf layout-extraction mode to preserve column spacing.
+      2. If the extracted text already contains pipe or comma delimiters (≥3
+         per line), return it as-is — the main parser handles those natively.
+      3. Otherwise, reconstruct columns by splitting each data line on runs of
+         2+ spaces (layout mode uses blank space to represent visual column gaps).
+         Lines that start with a 13-digit EAN are treated as data rows; anything
+         else is kept verbatim (header rows, blank lines, etc.).
+      4. Reassemble as pipe-delimited text so the main parser reads it correctly.
+
     Raises ImportError if pypdf is not installed.
-    Raises ValueError if the PDF yields no extractable text.
+    Raises ValueError if no extractable or parseable text is found.
     """
     try:
         import pypdf  # type: ignore
@@ -231,13 +242,46 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> bytes:
         )
 
     reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
-    lines: list[str] = []
+    raw_lines: list[str] = []
     for page in reader.pages:
-        text = page.extract_text() or ""
-        lines.extend(text.splitlines())
+        # layout mode preserves horizontal column spacing as runs of spaces
+        try:
+            text = page.extract_text(extraction_mode="layout") or ""
+        except Exception:
+            text = page.extract_text() or ""
+        raw_lines.extend(text.splitlines())
 
-    full_text = "\n".join(lines).strip()
+    full_text = "\n".join(raw_lines).strip()
     if not full_text:
         raise ValueError("PDF contains no extractable text. Is this a scanned image PDF?")
 
-    return full_text.encode("utf-8")
+    # Check whether the text already contains pipe or comma delimiters
+    non_empty = [l for l in full_text.splitlines() if l.strip()]
+    if non_empty:
+        sample = non_empty[0]
+        if sample.count("|") >= 3 or sample.count(",") >= 3:
+            # Already structured — return as-is
+            return full_text.encode("utf-8")
+
+    # No delimiters found — reconstruct columns from layout spacing.
+    # Data rows start with a 13-digit EAN; split them on 2+ spaces.
+    _EAN_ROW = re.compile(r"^\d{13}")
+    pipe_lines: list[str] = []
+    for line in full_text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if _EAN_ROW.match(stripped):
+            cols = re.split(r" {2,}", stripped)
+            pipe_lines.append("|".join(c.strip() for c in cols))
+        else:
+            # Header row or non-data line — pass through unchanged
+            pipe_lines.append(stripped)
+
+    if not pipe_lines:
+        raise ValueError(
+            "Could not extract structured data from this PDF. "
+            "Please export the bulk registration file as a pipe-delimited .txt or .csv instead."
+        )
+
+    return "\n".join(pipe_lines).encode("utf-8")
