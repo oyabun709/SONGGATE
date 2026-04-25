@@ -80,6 +80,11 @@ class BulkEnricher:
             ),
         }
 
+    @property
+    def mock(self) -> bool:
+        """True when the underlying client is running in mock/stub mode."""
+        return self._client.mock
+
     def enrich_batch(self, releases: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Enrich a batch of releases."""
         return [self.enrich_release(r) for r in releases]

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 const isPublicRoute = createRouteMatcher([
   "/",              // marketing landing page
   "/demo(.*)",      // public demo experience (no login required)
+  "/docs(.*)",      // public API documentation
   "/pitch(.*)",     // investor/partner pitch deck (public)
   "/onboarding(.*)", // self-guided onboarding (unauthenticated demo)
   "/share(.*)",     // public analytics share links

@@ -30,8 +30,9 @@ Pillow==10.4.0
 # MusicBrainz enrichment
 musicbrainzngs==0.7.1
 
-# PDF report generation
+# PDF report generation + PDF parsing for bulk registration files
 reportlab>=4.0.0
+pypdf==4.3.1
 
 # Stripe billing
 stripe>=10.0.0

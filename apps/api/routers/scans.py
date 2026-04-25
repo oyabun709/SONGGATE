@@ -137,6 +137,27 @@ async def create_bulk_scan(
 
     Returns the full bulk scan result immediately (synchronous — no polling needed).
     """
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+
+    try:
+        return await _create_bulk_scan_inner(file, background_tasks, db, org)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _log.exception("Unhandled error in create_bulk_scan: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal error processing bulk scan: {type(exc).__name__}: {exc}",
+        )
+
+
+async def _create_bulk_scan_inner(
+    file: UploadFile,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession,
+    org: Organization,
+) -> JSONResponse:
     from datetime import date, timezone as tz
     from services.bulk.bulk_parser import parse_bulk_file, extract_text_from_pdf
     from services.bulk.bulk_validator import validate_bulk_file
@@ -155,7 +176,7 @@ async def create_bulk_scan(
     if filename.lower().endswith(".pdf"):
         try:
             content = extract_text_from_pdf(content)
-        except (ImportError, ValueError) as exc:
+        except Exception as exc:
             raise HTTPException(status_code=422, detail=str(exc))
 
     # Enforce scan quota
@@ -183,7 +204,12 @@ async def create_bulk_scan(
     first_release = releases[0] if releases else None
     release_title  = filename.removesuffix(".txt").removesuffix(".csv").removesuffix(".pdf")
     release_artist = first_release.artist if first_release else "Various Artists"
-    release_upc    = first_release.ean if first_release else None
+    raw_ean = first_release.ean if first_release else None
+    if raw_ean:
+        _m = re.match(r'^\d+', raw_ean.strip())
+        release_upc = _m.group(0)[:20] if _m else None
+    else:
+        release_upc = None
 
     db_release = Release(
         id=uuid.uuid4(),

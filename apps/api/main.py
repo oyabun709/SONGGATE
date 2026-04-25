@@ -5,6 +5,7 @@ from fastapi.openapi.utils import get_openapi
 from config import settings
 from routers import releases, pipelines, rules, reports, health, webhooks, uploads, scans
 from routers import public_api, billing, admin, demo, catalog, webhook_settings
+from routers.admin import secret_router as admin_secret_router
 from middleware.rate_limit import APIKeyRateLimitMiddleware
 
 app = FastAPI(
@@ -43,13 +44,14 @@ _CORS_ORIGINS = list(dict.fromkeys(o for o in [
     "http://localhost:3000",
     "https://songgate.io",
     "https://www.songgate.io",
+    "https://songgate.vercel.app",
     settings.frontend_url,
 ] if o))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_CORS_ORIGINS,
-    allow_origin_regex=r"https://songgate-.*\.vercel\.app",
+    allow_origin_regex=r"https://songgate[^.]*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -82,6 +84,7 @@ app.include_router(webhook_settings.router, tags=["webhook-settings"])
 
 # ── Admin (Clerk JWT + admin user check) ──────────────────────────────────────
 app.include_router(admin.router, tags=["admin"])
+app.include_router(admin_secret_router, tags=["admin"])
 
 # ── Public API v1 (API key auth) ──────────────────────────────────────────────
 app.include_router(public_api.router, tags=["Public API v1"])

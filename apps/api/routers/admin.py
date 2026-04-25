@@ -12,10 +12,14 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from dependencies.admin import require_admin
+from dependencies.admin import require_admin, require_admin_secret
 from models.organization import Organization, OrgTier
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
+
+# Second router — same /admin prefix, authenticated by X-Admin-Secret header
+# (machine-to-machine; no Clerk JWT required).
+secret_router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin_secret)])
 
 
 # ── Response schemas ───────────────────────────────────────────────────────────
@@ -210,4 +214,88 @@ async def set_tier(
         "tier": org.tier.value,
         "is_trial": False,
         "scan_limit": org.scan_limit,
+    }
+
+
+# ── ADMIN_SECRET routes (POST /admin/users/{org_id}/upgrade + helpers) ────────
+
+class UpgradeRequest(BaseModel):
+    tier: str = "enterprise"  # starter | pro | enterprise
+
+
+@secret_router.get("/orgs-list")
+async def list_orgs_secret(
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """List all orgs with tier + scan stats. Auth: X-Admin-Secret header."""
+    from models.organization import TIER_SCAN_LIMIT
+    rows = await db.execute(text("""
+        SELECT
+            o.id, o.clerk_org_id, o.name, o.tier,
+            o.scan_count_current_period, o.settings, o.created_at,
+            COUNT(DISTINCT s.id) AS total_scans
+        FROM organizations o
+        LEFT JOIN scans s ON s.org_id = o.id
+        GROUP BY o.id
+        ORDER BY o.created_at DESC
+    """))
+    out = []
+    for row in rows.mappings().all():
+        settings_data: dict = row["settings"] or {}
+        override = settings_data.get("scan_limit_override")
+        tier_val = row["tier"]
+        try:
+            tier_enum = OrgTier(tier_val)
+        except ValueError:
+            tier_enum = OrgTier.starter
+        scan_limit = int(override) if override is not None else TIER_SCAN_LIMIT.get(tier_enum, 50)
+        out.append({
+            "id": str(row["id"]),
+            "name": row["name"],
+            "tier": tier_val,
+            "scan_count": row["scan_count_current_period"],
+            "scan_limit": scan_limit,
+            "total_scans": row["total_scans"],
+            "created_at": row["created_at"].isoformat(),
+        })
+    return out
+
+
+@secret_router.post("/users/{org_id}/upgrade")
+async def upgrade_user(
+    org_id: str,
+    body: UpgradeRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Set an org's tier and reset scan count.
+
+    POST /admin/users/{org_id}/upgrade
+    Header: X-Admin-Secret: <secret>
+    Body: { "tier": "enterprise" }
+    """
+    try:
+        tier = OrgTier(body.tier)
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Unknown tier: {body.tier!r}")
+
+    org = await _get_org(db, org_id)
+    org.tier = tier
+    # Clear any trial/override flags — tier itself governs limits now
+    settings_data = dict(org.settings or {})
+    settings_data.pop("is_trial", None)
+    settings_data.pop("scan_limit_override", None)
+    # Enterprise gets a hard -1 override as belt-and-suspenders
+    if tier == OrgTier.enterprise:
+        settings_data["scan_limit_override"] = -1
+    org.settings = settings_data
+    await db.commit()
+    await db.refresh(org)
+
+    return {
+        "org_id": str(org.id),
+        "name": org.name,
+        "tier": org.tier.value,
+        "scan_limit": org.scan_limit,
+        "message": f"Upgraded to {tier.value}",
     }

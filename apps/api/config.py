@@ -94,5 +94,9 @@ class Settings(BaseSettings):
     # e.g. ADMIN_USER_IDS=user_abc123,user_xyz456
     admin_user_ids: str = ""
 
+    # Static secret for machine-to-machine admin calls (no Clerk required).
+    # Pass as X-Admin-Secret header.  Leave empty to disable.
+    admin_secret: str = ""
+
 
 settings = Settings()

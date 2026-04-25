@@ -3,10 +3,18 @@ from sqlalchemy.orm import DeclarativeBase
 
 from config import settings
 
-# asyncpg uses connect_args for SSL rather than URL params
-_connect_args = {"ssl": True} if settings.database_url_requires_ssl else {}
+# asyncpg uses connect_args for SSL rather than URL params.
+# statement_cache_size=0 is required for Neon's pgbouncer pooler, which runs
+# in transaction mode and does not support prepared statements.
+_connect_args: dict = {"statement_cache_size": 0}
+if settings.database_url_requires_ssl:
+    _connect_args["ssl"] = True
 
-engine = create_async_engine(settings.database_url, echo=settings.debug, connect_args=_connect_args)
+engine = create_async_engine(
+    settings.database_url,
+    echo=settings.debug,
+    connect_args=_connect_args,
+)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 

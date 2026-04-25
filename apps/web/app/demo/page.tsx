@@ -780,14 +780,41 @@ export default function DemoPage() {
   async function scanISRC() {
     setScanError(null);
     const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-    const promise = fetch(`${API}/api/demo/isrc`, { method: "POST" })
+    // /api/demo/isrc is not yet implemented — route to /api/demo/bulk and
+    // adapt the response shape to ISRCDemoScan so the ISRC results panel renders.
+    const promise = fetch(`${API}/api/demo/bulk`, { method: "POST" })
       .then(async res => {
         if (res.status === 429) {
           const d = await res.json().catch(() => ({}));
           throw new Error(d.detail?.message ?? "Rate limit reached.");
         }
         if (!res.ok) throw new Error("Scan failed. Please try again.");
-        return res.json() as Promise<ISRCDemoScan>;
+        const bulk = await res.json();
+        const perRelease: BulkPerReleaseEntry[] =
+          bulk.per_release ?? bulk.per_release_issues ?? [];
+        return {
+          scan_id:           bulk.scan_id,
+          demo:              bulk.demo,
+          format:            "isrc_registration" as const,
+          watermark:         bulk.watermark,
+          status:            bulk.status,
+          readiness_score:   bulk.readiness_score,
+          grade:             bulk.grade,
+          total_records:     bulk.total_releases,
+          critical_count:    bulk.critical_count,
+          warning_count:     bulk.warning_count,
+          info_count:        bulk.info_count,
+          total_issues:      bulk.total_issues,
+          cross_record_issues: bulk.cross_release_issues ?? [],
+          per_record_issues: perRelease.map(r => ({
+            row_number: r.row_number,
+            isrc:       r.ean,
+            artist:     r.artist,
+            title:      r.title,
+            issues:     r.issues,
+          })),
+          completed_at: bulk.completed_at,
+        } as ISRCDemoScan;
       });
     await animateLayers(promise, "isrc");
   }

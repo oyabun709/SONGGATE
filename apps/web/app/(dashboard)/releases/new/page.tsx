@@ -3,8 +3,8 @@
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { useDropzone } from "react-dropzone";
-import { Upload, FileText, ChevronRight, ChevronLeft, Check, Loader2, Music, FileCode2 } from "lucide-react";
+import { useDropzone, type Accept } from "react-dropzone";
+import { Upload, FileText, ChevronRight, ChevronLeft, Check, Loader2, Music, FileCode2, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createRelease, createScan } from "@/lib/api";
 import JSZip from "jszip";
@@ -26,12 +26,24 @@ const LAYERS = [
   { id: "enrichment", label: "MusicBrainz enrichment", desc: "Composer, ISWC, label suggestions" },
 ];
 
-const FORMAT_OPTIONS = [
-  { value: "DDEX_ERN_43", label: "DDEX ERN 4.3", icon: FileCode2 },
-  { value: "DDEX_ERN_42", label: "DDEX ERN 4.2", icon: FileCode2 },
-  { value: "CSV", label: "CSV", icon: FileText },
-  { value: "JSON", label: "JSON", icon: FileText },
+interface FormatOption {
+  value: string;
+  label: string;
+  sublabel: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const FORMAT_OPTIONS: FormatOption[] = [
+  { value: "DDEX_ERN_43",        label: "DDEX ERN 4.3",      sublabel: "XML package",         icon: FileCode2 },
+  { value: "DDEX_ERN_42",        label: "DDEX ERN 4.2",      sublabel: "XML package",         icon: FileCode2 },
+  { value: "BULK_REGISTRATION",  label: "Bulk Registration",  sublabel: "EAN reference file",  icon: List },
+  { value: "ISRC_REFERENCE",     label: "ISRC Reference",     sublabel: "ISRC reference file", icon: List },
+  { value: "CSV",                label: "CSV",                sublabel: "Spreadsheet format",  icon: FileText },
+  { value: "JSON",               label: "JSON",               sublabel: "Structured data",     icon: FileText },
 ];
+
+// Formats that bypass the release/scan lifecycle and post directly to a bulk endpoint
+const BULK_FORMATS = new Set(["BULK_REGISTRATION", "ISRC_REFERENCE"]);
 
 type Step = 0 | 1 | 2;
 
@@ -101,6 +113,8 @@ export default function NewScanPage() {
     layers: LAYERS.map((l) => l.id),
   });
 
+  const isBulkFormat = BULK_FORMATS.has(form.format);
+
   // ── Auto-populate parsers ─────────────────────────────────────────────────
 
   function parseDdexXml(text: string): Partial<FormState> {
@@ -109,7 +123,6 @@ export default function NewScanPage() {
       const doc = parser.parseFromString(text, "application/xml");
       if (doc.querySelector("parsererror")) return {};
 
-      // Find main Release element inside ReleaseList
       const releaseListEl = doc.getElementsByTagNameNS("*", "ReleaseList")[0]
         ?? doc.getElementsByTagName("ReleaseList")[0];
       let releaseEl: Element | null = null;
@@ -137,7 +150,6 @@ export default function NewScanPage() {
 
       const patch: Partial<FormState> = {};
 
-      // Title — prefer ReferenceTitle/TitleText, then FormalTitle, then any TitleText
       let title: string | undefined;
       const refTitle = scope.getElementsByTagNameNS("*", "ReferenceTitle")[0];
       if (refTitle) {
@@ -155,7 +167,6 @@ export default function NewScanPage() {
       if (!title) title = getFirst(scope, "TitleText");
       if (title) patch.title = title;
 
-      // Artist — prefer DisplayArtistName, then DisplayArtist/PartyName/FullName
       let artist: string | undefined;
       artist = getFirst(scope, "DisplayArtistName");
       if (!artist) {
@@ -167,11 +178,9 @@ export default function NewScanPage() {
       }
       if (artist) patch.artist = artist;
 
-      // UPC
       const upc = getFirst(scope, "ICPN", "UPC");
       if (upc) patch.upc = upc;
 
-      // Date
       const rawDate = getFirst(scope, "OriginalReleaseDate", "ReleaseDate");
       if (rawDate) {
         patch.releaseDate = rawDate.length === 4 ? `${rawDate}-01-01` : rawDate.slice(0, 10);
@@ -244,6 +253,12 @@ export default function NewScanPage() {
     const applyPatch = (patch: Partial<FormState>) =>
       setForm((prev) => ({ ...prev, file: f, ...patch }));
 
+    // Bulk / ISRC formats — just store the file, no metadata extraction
+    if (BULK_FORMATS.has(form.format)) {
+      setForm((prev) => ({ ...prev, file: f }));
+      return;
+    }
+
     if (name.endsWith(".xml")) {
       const reader = new FileReader();
       reader.onload = (e) => applyPatch(parseDdexXml(e.target?.result as string));
@@ -270,18 +285,34 @@ export default function NewScanPage() {
     } else {
       setForm((prev) => ({ ...prev, file: f }));
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.format]);
+
+  // Accept different file types depending on format
+  const dropzoneAccept: Accept = isBulkFormat
+    ? { "text/plain": [".txt"], "text/csv": [".csv"], "application/pdf": [".pdf"] }
+    : { "application/zip": [".zip"], "text/xml": [".xml"], "text/csv": [".csv"], "application/json": [".json"] };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      "application/zip": [".zip"],
-      "text/xml": [".xml"],
-      "text/csv": [".csv"],
-      "application/json": [".json"],
-    },
+    accept: dropzoneAccept,
     maxFiles: 1,
   });
+
+  // Dropzone helper text
+  const dropzoneHint =
+    form.format === "BULK_REGISTRATION"
+      ? "Drop your bulk registration file here, or browse. Accepts pipe-delimited .txt, .csv, or .pdf — max 50 MB."
+      : form.format === "ISRC_REFERENCE"
+      ? "Drop your ISRC reference file here, or browse. Accepts pipe-delimited .txt, .csv, or .pdf — max 50 MB."
+      : "ZIP, XML, CSV, or JSON — max 50 MB";
+
+  const dropzoneTitle =
+    form.format === "BULK_REGISTRATION"
+      ? "Drop your bulk registration file here, or"
+      : form.format === "ISRC_REFERENCE"
+      ? "Drop your ISRC reference file here, or"
+      : "Drop your DDEX package here, or";
 
   // ── Direct multipart upload to /releases/{id}/upload ────────────────────
   async function uploadFileDirect(
@@ -309,20 +340,41 @@ export default function NewScanPage() {
     setError(null);
     setStep(2);
 
-    // Animate layer progress
-    const layers = form.layers;
-    const delays = layers.map((_, i) => i * 1200);
-    for (let i = 0; i < layers.length; i++) {
-      const layerId = layers[i];
-      setTimeout(() => setLayerProgress((p) => ({ ...p, [layerId]: "running" })), delays[i]);
-      setTimeout(() => setLayerProgress((p) => ({ ...p, [layerId]: "done" })), delays[i] + 900);
-    }
-
     try {
       const token = await getToken();
       if (!token) throw new Error("Not authenticated");
+      const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-      // 1. Create the release record
+      // ── Bulk Registration / ISRC Reference: direct file POST ────────────
+      if (isBulkFormat) {
+        if (!form.file) throw new Error("No file selected");
+        const endpoint =
+          form.format === "BULK_REGISTRATION" ? "/scans/bulk" : "/scans/isrc";
+        const body = new FormData();
+        body.append("file", form.file);
+        const res = await fetch(`${API}${endpoint}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body,
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.detail ?? "Scan failed");
+        }
+        const data = await res.json();
+        router.push(`/scans/${data.scan_id}`);
+        return;
+      }
+
+      // ── Standard DDEX / CSV / JSON flow ──────────────────────────────────
+      const layers = form.layers;
+      const delays = layers.map((_, i) => i * 1200);
+      for (let i = 0; i < layers.length; i++) {
+        const layerId = layers[i];
+        setTimeout(() => setLayerProgress((p) => ({ ...p, [layerId]: "running" })), delays[i]);
+        setTimeout(() => setLayerProgress((p) => ({ ...p, [layerId]: "done" })), delays[i] + 900);
+      }
+
       const release = await createRelease(
         {
           title: form.title,
@@ -335,11 +387,9 @@ export default function NewScanPage() {
       );
 
       if (form.inputMode === "upload" && form.file) {
-        // 2a. Upload file directly to API (stored as data URI)
         await uploadFileDirect(form.file, release.id, token);
       }
 
-      // 2b. Trigger scan (always — file upload doesn't auto-create a scan)
       const scan = await createScan(release.id, token, {
         dsps: form.dsps,
         layers: form.layers,
@@ -347,13 +397,11 @@ export default function NewScanPage() {
       const scanIdToUse = scan.id;
 
       setScanId(scanIdToUse);
-
-      // 3. Poll until complete then redirect
       await pollUntilComplete(scanIdToUse, token);
       router.push(`/scans/${scanIdToUse}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "An error occurred");
-      setStep(1);
+      setStep(isBulkFormat ? 0 : 1);
     } finally {
       setSubmitting(false);
     }
@@ -386,7 +434,10 @@ export default function NewScanPage() {
     }));
   };
 
-  const step0Valid = form.title && form.artist && (form.inputMode === "manual" || form.file);
+  // Bulk formats only need a file; standard formats need title + artist + file
+  const step0Valid = isBulkFormat
+    ? form.file !== null
+    : form.title && form.artist && (form.inputMode === "manual" || form.file);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
@@ -394,7 +445,7 @@ export default function NewScanPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">New Scan</h1>
         <p className="mt-0.5 text-sm text-slate-500">
-          Work with three supported formats: DDEX XML, CSV, and JSON.
+          Work with five supported formats: DDEX XML, Bulk Registration, ISRC Reference, CSV, and JSON.
         </p>
       </div>
 
@@ -403,41 +454,49 @@ export default function NewScanPage() {
       {/* ── Step 0: Upload ─────────────────────────────────────────────── */}
       {step === 0 && (
         <div className="space-y-6">
-          {/* Input mode toggle */}
-          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-            {(["upload", "manual"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setForm((f) => ({ ...f, inputMode: mode }))}
-                className={cn(
-                  "flex-1 rounded-md py-2 text-sm font-medium transition-colors",
-                  form.inputMode === mode
-                    ? "bg-white shadow-sm text-slate-900"
-                    : "text-slate-500 hover:text-slate-700"
-                )}
-              >
-                {mode === "upload" ? "Upload Package" : "Manual Entry"}
-              </button>
-            ))}
-          </div>
+          {/* Input mode toggle — hidden for bulk formats (always upload) */}
+          {!isBulkFormat && (
+            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+              {(["upload", "manual"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setForm((f) => ({ ...f, inputMode: mode }))}
+                  className={cn(
+                    "flex-1 rounded-md py-2 text-sm font-medium transition-colors",
+                    form.inputMode === mode
+                      ? "bg-white shadow-sm text-slate-900"
+                      : "text-slate-500 hover:text-slate-700"
+                  )}
+                >
+                  {mode === "upload" ? "Upload Package" : "Manual Entry"}
+                </button>
+              ))}
+            </div>
+          )}
 
-          {form.inputMode === "upload" && (
+          {(form.inputMode === "upload" || isBulkFormat) && (
             <div>
-              {/* Format selector */}
-              <div className="mb-4 grid grid-cols-4 gap-2">
+              {/* Format selector — 3-column grid to fit 6 options */}
+              <div className="mb-4 grid grid-cols-3 gap-2">
                 {FORMAT_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
-                    onClick={() => setForm((f) => ({ ...f, format: opt.value }))}
+                    onClick={() => setForm((f) => ({ ...f, format: opt.value, file: null }))}
                     className={cn(
-                      "flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center text-xs font-medium transition-colors",
+                      "flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-colors",
                       form.format === opt.value
                         ? "border-indigo-300 bg-indigo-50 text-indigo-700"
                         : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"
                     )}
                   >
                     <opt.icon className="h-5 w-5" />
-                    {opt.label}
+                    <span className="text-xs font-medium leading-tight">{opt.label}</span>
+                    <span className={cn(
+                      "text-[10px] leading-tight",
+                      form.format === opt.value ? "text-indigo-500" : "text-slate-400"
+                    )}>
+                      {opt.sublabel}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -472,11 +531,11 @@ export default function NewScanPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-slate-700">
-                        Drop your DDEX package here, or{" "}
+                        {dropzoneTitle}{" "}
                         <span className="text-indigo-600">browse</span>
                       </p>
-                      <p className="mt-0.5 text-xs text-slate-400">
-                        ZIP, XML, CSV, or JSON — max 50 MB
+                      <p className="mt-0.5 text-xs text-slate-400 max-w-xs mx-auto">
+                        {dropzoneHint}
                       </p>
                     </div>
                   </div>
@@ -485,61 +544,84 @@ export default function NewScanPage() {
             </div>
           )}
 
-          {/* Release metadata fields */}
-          <div className="rounded-lg border border-slate-200 bg-white p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-slate-800">Release Details</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">
-                  Release Title <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="e.g. Midnight Drive"
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">
-                  Artist Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={form.artist}
-                  onChange={(e) => setForm((f) => ({ ...f, artist: e.target.value }))}
-                  placeholder="e.g. The Band"
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">UPC</label>
-                <input
-                  value={form.upc}
-                  onChange={(e) => setForm((f) => ({ ...f, upc: e.target.value }))}
-                  placeholder="e.g. 012345678901"
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-slate-600">Release Date</label>
-                <input
-                  type="date"
-                  value={form.releaseDate}
-                  onChange={(e) => setForm((f) => ({ ...f, releaseDate: e.target.value }))}
-                  className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                />
+          {/* Release metadata — only shown for non-bulk formats */}
+          {!isBulkFormat && (
+            <div className="rounded-lg border border-slate-200 bg-white p-5 space-y-4">
+              <h3 className="text-sm font-semibold text-slate-800">Release Details</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                    Release Title <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={form.title}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    placeholder="e.g. Midnight Drive"
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                    Artist Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={form.artist}
+                    onChange={(e) => setForm((f) => ({ ...f, artist: e.target.value }))}
+                    placeholder="e.g. The Band"
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">UPC</label>
+                  <input
+                    value={form.upc}
+                    onChange={(e) => setForm((f) => ({ ...f, upc: e.target.value }))}
+                    placeholder="e.g. 012345678901"
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-600">Release Date</label>
+                  <input
+                    type="date"
+                    value={form.releaseDate}
+                    onChange={(e) => setForm((f) => ({ ...f, releaseDate: e.target.value }))}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {error && (
+            <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
 
           <div className="flex justify-end">
-            <button
-              onClick={() => setStep(1)}
-              disabled={!step0Valid}
-              className="flex items-center gap-2 rounded-md bg-indigo-600 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Configure <ChevronRight className="h-4 w-4" />
-            </button>
+            {isBulkFormat ? (
+              /* Bulk/ISRC: skip configure step, run directly */
+              <button
+                onClick={handleRunScan}
+                disabled={!step0Valid || submitting}
+                className="flex items-center gap-2 rounded-md bg-indigo-600 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Running…</>
+                ) : (
+                  <>Run Scan <Music className="h-4 w-4" /></>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={() => setStep(1)}
+                disabled={!step0Valid}
+                className="flex items-center gap-2 rounded-md bg-indigo-600 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Configure <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -644,9 +726,13 @@ export default function NewScanPage() {
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100">
               <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-900">Scan in Progress</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {isBulkFormat ? "Processing File…" : "Scan in Progress"}
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Running all QA layers — this usually takes 15–30 seconds.
+              {isBulkFormat
+                ? "Validating your file and scoring readiness — usually under 10 seconds."
+                : "Running all QA layers — this usually takes 15–30 seconds."}
             </p>
             {scanId && (
               <p className="mt-2 font-mono text-xs text-slate-400">
@@ -655,39 +741,41 @@ export default function NewScanPage() {
             )}
           </div>
 
-          <div className="space-y-3">
-            {form.layers.map((layerId) => {
-              const layer = LAYERS.find((l) => l.id === layerId);
-              const s = layerProgress[layerId] ?? "pending";
-              return (
-                <div key={layerId} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50/60 p-3.5">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
-                    {s === "done" ? (
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100">
-                        <Check className="h-4 w-4 text-emerald-600" />
-                      </div>
-                    ) : s === "running" ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
-                    ) : (
-                      <div className="h-5 w-5 rounded-full border-2 border-slate-200" />
-                    )}
+          {!isBulkFormat && (
+            <div className="space-y-3">
+              {form.layers.map((layerId) => {
+                const layer = LAYERS.find((l) => l.id === layerId);
+                const s = layerProgress[layerId] ?? "pending";
+                return (
+                  <div key={layerId} className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50/60 p-3.5">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
+                      {s === "done" ? (
+                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100">
+                          <Check className="h-4 w-4 text-emerald-600" />
+                        </div>
+                      ) : s === "running" ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-indigo-500" />
+                      ) : (
+                        <div className="h-5 w-5 rounded-full border-2 border-slate-200" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className={cn("text-sm font-medium", s === "done" ? "text-slate-500" : "text-slate-800")}>
+                        {layer?.label ?? layerId}
+                      </p>
+                      <p className="text-xs text-slate-400">{layer?.desc}</p>
+                    </div>
+                    <span className={cn(
+                      "text-xs font-medium",
+                      s === "done" ? "text-emerald-600" : s === "running" ? "text-indigo-600" : "text-slate-300"
+                    )}>
+                      {s === "done" ? "Done" : s === "running" ? "Running…" : "Queued"}
+                    </span>
                   </div>
-                  <div className="flex-1">
-                    <p className={cn("text-sm font-medium", s === "done" ? "text-slate-500" : "text-slate-800")}>
-                      {layer?.label ?? layerId}
-                    </p>
-                    <p className="text-xs text-slate-400">{layer?.desc}</p>
-                  </div>
-                  <span className={cn(
-                    "text-xs font-medium",
-                    s === "done" ? "text-emerald-600" : s === "running" ? "text-indigo-600" : "text-slate-300"
-                  )}>
-                    {s === "done" ? "Done" : s === "running" ? "Running…" : "Queued"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
