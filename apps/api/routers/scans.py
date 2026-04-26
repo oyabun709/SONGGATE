@@ -770,9 +770,21 @@ async def get_scan_results(
     if not scan:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Scan not found")
 
-    # Fetch associated release to get submission_format
-    release_row = await db.get(Release, scan.release_id)
-    submission_format = (release_row.submission_format.value if release_row else None)
+    # Fetch associated release to get submission_format.
+    # Use explicit select (not db.get) to bypass the identity map and avoid
+    # stale / expired instance issues in the async session.
+    _rel_result = await db.execute(select(Release).where(Release.id == scan.release_id))
+    release_row = _rel_result.scalar_one_or_none()
+    if release_row is not None:
+        _sf = release_row.submission_format
+        # str enums have .value; a plain string (defensive) doesn't
+        submission_format = _sf.value if hasattr(_sf, "value") else str(_sf)
+        # ISRC registration files are stored with BULK_REGISTRATION format on the
+        # release, but the scan layer is "isrc_registration" — expose the real type.
+        if submission_format == "BULK_REGISTRATION" and "isrc_registration" in (scan.layers_run or []):
+            submission_format = "ISRC_REGISTRATION"
+    else:
+        submission_format = None
 
     query = select(ScanResult).where(ScanResult.scan_id == uuid.UUID(scan_id))
 

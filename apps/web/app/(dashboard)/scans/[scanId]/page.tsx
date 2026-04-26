@@ -38,12 +38,28 @@ const LAYER_LABELS: Record<string, string> = {
 };
 
 const FORMAT_LABELS: Record<string, string> = {
-  DDEX_ERN_43: "DDEX ERN 4.3",
-  DDEX_ERN_42: "DDEX ERN 4.2",
-  CSV:              "CSV Metadata",
-  JSON:             "JSON",
+  DDEX_ERN_43:       "DDEX ERN 4.3",
+  DDEX_ERN_42:       "DDEX ERN 4.2",
+  CSV:               "CSV Metadata",
+  JSON:              "JSON",
   BULK_REGISTRATION: "Bulk Registration",
+  ISRC_REGISTRATION: "ISRC Reference",
+  ISRC_REFERENCE:    "ISRC Reference",
 };
+
+/** Derive a display label from what the API returns or from layers_run as fallback. */
+function resolveFormatLabel(
+  submissionFormat: string | null | undefined,
+  layersRun: string[]
+): string | null {
+  if (submissionFormat) {
+    return FORMAT_LABELS[submissionFormat] ?? submissionFormat;
+  }
+  // Fallback: infer from layers_run when submission_format is missing
+  if (layersRun.includes("isrc_registration")) return "ISRC Reference";
+  if (layersRun.includes("bulk_registration"))  return "Bulk Registration";
+  return null;
+}
 
 const LAYER_ORDER = ["ddex", "metadata", "fraud", "artwork", "enrichment", "bulk_registration"];
 
@@ -499,19 +515,24 @@ export default function ScanResultsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Scan Results</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-semibold text-slate-900">Scan Results</h1>
+            {(() => {
+              const label = resolveFormatLabel(scan.submission_format, scan.layers_run);
+              return label ? (
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 border border-slate-200">
+                  {label}
+                </span>
+              ) : null;
+            })()}
+          </div>
           <p className="mt-0.5 text-xs font-mono text-slate-400">{params.scanId}</p>
         </div>
         <div className="flex items-center gap-2">
           {isRunning && (
             <div className="flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-600">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Scanning
-              {scan.submission_format && (
-                <span className="ml-0.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-indigo-700">
-                  {FORMAT_LABELS[scan.submission_format] ?? scan.submission_format}
-                </span>
-              )}
+              Scanning…
             </div>
           )}
           <button
