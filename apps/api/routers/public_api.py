@@ -16,6 +16,7 @@ Releases
   GET    /api/v1/releases
   GET    /api/v1/releases/{release_id}
   DELETE /api/v1/releases/{release_id}
+  POST   /api/v1/releases/upload          — generic multi-format upload (CSV, JSON, XML)
 
 Scans
   POST   /api/v1/releases/{release_id}/scan
@@ -250,6 +251,8 @@ class PublicScanOut(BaseModel):
     started_at: datetime | None
     completed_at: datetime | None
     created_at: datetime
+    submission_format: str | None = None
+    release_title: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -839,6 +842,152 @@ async def upload_ddex(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# POST /releases/upload   — generic multi-format upload (CSV, JSON, XML)
+# ──────────────────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/releases/upload",
+    response_model=PublicReleaseWithScan,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Upload metadata file and create release (CSV / JSON / XML)",
+    description=(
+        "Accept a metadata file in any supported format — DDEX XML, CSV, or JSON — "
+        "via `multipart/form-data`.  Format is auto-detected from the filename extension "
+        "and file content.  A release record is created and (if `trigger_scan` is true) "
+        "a QA scan is queued immediately.  Poll `GET /api/v1/scans/{scan_id}` for results."
+    ),
+)
+async def upload_release(
+    background_tasks: BackgroundTasks,
+    org: OrgDep,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(..., description="DDEX XML, CSV, or JSON metadata file"),
+    trigger_scan: bool = Form(True, description="Immediately queue a QA scan"),
+    external_id: str | None = Form(None, description="Your internal release ID"),
+) -> PublicReleaseWithScan:
+    import base64 as _b64
+    from file_types import detect_format
+    from services.ddex.validator import DDEXParser
+    from services.ddex.csv_parser import CSVParser
+    from services.ddex.json_parser import JSONParser
+
+    content = await file.read()
+    filename = file.filename or ""
+    fmt = detect_format(content, filename)  # "xml", "csv", or "json"
+
+    # ── Parse metadata to extract title / artist ──────────────────────────
+    title = "Unknown Release"
+    artist = "Unknown Artist"
+
+    if fmt == "xml":
+        try:
+            parsed = DDEXParser().extract_metadata(content)
+            title = parsed.get("title") or title
+            artist = parsed.get("artist") or artist
+        except Exception:
+            pass
+        # Detect ERN version from namespace
+        submission_format = SubmissionFormat.DDEX_ERN_43
+        try:
+            from lxml import etree as _etree
+            _root = _etree.fromstring(content)
+            _ns = _root.tag[1:].split("}")[0] if _root.tag.startswith("{") else ""
+            if "ern/42" in _ns:
+                submission_format = SubmissionFormat.DDEX_ERN_42
+        except Exception:
+            pass
+        tracks_parsed: list[dict] = []
+        try:
+            tracks_parsed = DDEXParser().extract_metadata(content).get("tracks", [])
+        except Exception:
+            pass
+    elif fmt == "csv":
+        submission_format = SubmissionFormat.CSV
+        try:
+            result = CSVParser().parse(content)
+            if result.releases:
+                r0 = result.releases[0]
+                title = r0.get("title") or r0.get("release_title") or title
+                artist = r0.get("artist") or r0.get("artist_name") or artist
+        except Exception:
+            pass
+        tracks_parsed = []
+    else:  # json
+        submission_format = SubmissionFormat.JSON
+        try:
+            result = JSONParser().parse(content)
+            if result.releases:
+                r0 = result.releases[0]
+                title = r0.get("title") or title
+                artist = r0.get("artist") or artist
+        except Exception:
+            pass
+        tracks_parsed = []
+
+    # ── Store content as data URI (no S3 for CSV/JSON) ───────────────────
+    mime_map = {"xml": "application/xml", "csv": "text/csv", "json": "application/json"}
+    encoded = _b64.b64encode(content).decode()
+    raw_package_url = f"data:{mime_map.get(fmt, 'application/octet-stream')};base64,{encoded}"
+
+    # ── Create release row ─────────────────────────────────────────────────
+    release = Release(
+        id=uuid.uuid4(),
+        org_id=org.id,
+        external_id=external_id,
+        title=title,
+        artist=artist,
+        submission_format=submission_format,
+        raw_package_url=raw_package_url,
+        status=ReleaseStatus.ingesting,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(release)
+    await db.flush()
+
+    # Create Track rows for DDEX XML (CSV/JSON tracks handled by scan engine)
+    from models.track import Track as TrackModel
+    for idx, t in enumerate(tracks_parsed, start=1):
+        raw_isrc = t.get("isrc") or None
+        isrc = raw_isrc.replace("-", "")[:12] if raw_isrc else None
+        db.add(TrackModel(
+            id=uuid.uuid4(),
+            release_id=release.id,
+            isrc=isrc,
+            title=t.get("title") or "Unknown",
+            track_number=idx,
+            duration_ms=t.get("duration_ms"),
+        ))
+
+    scan_out: Scan | None = None
+    if trigger_scan:
+        scan_out = Scan(
+            id=uuid.uuid4(),
+            release_id=release.id,
+            org_id=org.id,
+            status=ScanStatus.queued,
+            layers_run=[],
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(scan_out)
+
+    await db.commit()
+    await db.refresh(release)
+    if scan_out:
+        await db.refresh(scan_out)
+        background_tasks.add_task(
+            _run_scan_bg,
+            release_id=str(release.id),
+            scan_id=str(scan_out.id),
+            org_id=str(org.id),
+        )
+
+    return PublicReleaseWithScan(
+        release=PublicReleaseOut.model_validate(release),
+        scan=PublicScanOut.model_validate(scan_out) if scan_out else None,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # POST /releases/{release_id}/artwork   — upload cover art
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -1185,7 +1334,12 @@ async def get_scan(
     db: AsyncSession = Depends(get_db),
 ) -> PublicScanOut:
     scan = await _get_scan_for_org(db, scan_id, org.id)
-    return PublicScanOut.model_validate(scan)
+    release = await db.get(Release, scan.release_id)
+    out = PublicScanOut.model_validate(scan)
+    if release:
+        out.submission_format = release.submission_format.value if release.submission_format else None
+        out.release_title = release.title
+    return out
 
 
 @router.get(
@@ -1213,6 +1367,7 @@ async def get_scan_results(
     ),
 ) -> ScanResultsOut:
     scan = await _get_scan_for_org(db, scan_id, org.id)
+    release = await db.get(Release, scan.release_id)
 
     q = select(ScanResult).where(ScanResult.scan_id == scan_id)
     if layer:
@@ -1226,8 +1381,13 @@ async def get_scan_results(
     rows = await db.execute(q)
     results = list(rows.scalars().all())
 
+    scan_out = PublicScanOut.model_validate(scan)
+    if release:
+        scan_out.submission_format = release.submission_format.value if release.submission_format else None
+        scan_out.release_title = release.title
+
     return ScanResultsOut(
-        scan=PublicScanOut.model_validate(scan),
+        scan=scan_out,
         results=[PublicScanResultOut.model_validate(r) for r in results],
         total=len(results),
     )

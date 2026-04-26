@@ -158,7 +158,7 @@ rules:
     check: "metadata.artwork_width == 0 or (metadata.artwork_width >= 3000 and metadata.artwork_height >= 3000)"
     fix_hint: Re-export artwork at 3000×3000 px or higher.
     doc_url: null
-    active: true
+    active: false  # deduplicated — covered by universal.artwork.minimum_resolution
 
   - id: amazon.artwork.rgb_color_space
     layer: artwork

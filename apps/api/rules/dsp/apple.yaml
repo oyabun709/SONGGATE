@@ -177,7 +177,7 @@ rules:
     check: "metadata.artwork_width == 0 or (metadata.artwork_width >= 3000 and metadata.artwork_height >= 3000)"
     fix_hint: Export cover art as 3000×3000 px RGB JPEG (sRGB colour space).
     doc_url: https://help.apple.com/itc/musicstyleguide/#/apdee6f2d073
-    active: true
+    active: false  # deduplicated — covered by universal.artwork.minimum_resolution
 
   - id: apple.artwork.rgb_color_space_required
     layer: artwork
