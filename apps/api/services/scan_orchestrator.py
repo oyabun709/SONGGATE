@@ -436,6 +436,41 @@ class ScanOrchestrator:
                 )
                 for e in (parse_result.errors if hasattr(parse_result, "errors") else [])
             ]
+
+            # Populate release.metadata_ from parsed CSV so the metadata rules
+            # engine has real values instead of empty defaults.
+            if parse_result.releases:
+                rel = parse_result.releases[0]
+                tracks = rel.get("tracks", [])
+                isrc_list = [t["isrc"] for t in tracks if t.get("isrc")]
+                composers = list({
+                    t["composer"] for t in tracks
+                    if t.get("composer")
+                })
+                md_update = {
+                    "label":           rel.get("label") or "",
+                    "release_type":    rel.get("release_type") or "",
+                    "genre":           rel.get("genre") or "",
+                    "parental_warning": rel.get("parental_warning") or "",
+                    "c_line":          rel.get("c_line") or "",
+                    "p_line":          rel.get("p_line") or "",
+                    "territory":       rel.get("territory") or "Worldwide",
+                    "commercial_model": rel.get("commercial_model") or "",
+                    "tracks":          tracks,
+                    "isrc_list":       isrc_list,
+                    "composers":       composers,
+                }
+                existing = dict(release.metadata_ or {})
+                existing.update(md_update)
+                release.metadata_ = existing
+                try:
+                    await db.commit()
+                except Exception as exc:
+                    logger.warning("CSV layer: metadata commit failed: %s", exc)
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
         else:
             findings = []
 
