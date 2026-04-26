@@ -116,11 +116,15 @@ def _normalise_row(fields: list[str], row_number: int) -> ParsedRelease | None:
     while len(fields) < _MIN_COLUMNS:
         fields.append("")
 
-    # Check if all fields are empty — skip silently
+    # Skip entirely-empty rows (e.g. blank template rows "||||||" in PDFs)
     if all(f.strip() == "" for f in fields):
         return None
 
-    ean         = fields[0].strip()
+    # Skip rows where the EAN field is empty — blank template rows in some
+    # PDFs have whitespace in non-EAN columns that pass the all-empty check.
+    ean = fields[0].strip()
+    if not ean:
+        return None
     artist      = fields[1].strip()
     title       = fields[2].strip()
     date_raw    = fields[3].strip()

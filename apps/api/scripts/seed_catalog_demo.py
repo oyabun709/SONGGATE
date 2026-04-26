@@ -226,7 +226,7 @@ def main():
             ) VALUES (
                 %(ean)s, %(artist)s, %(artist_normalized)s, %(title)s, %(title_normalized)s,
                 %(release_date)s, %(imprint)s, %(label)s, %(narm_config)s, %(isni)s, %(iswc)s,
-                %(scan_id)s, %(org_id)s, false, %(first_seen)s, %(last_seen)s, 1
+                %(scan_id)s, %(org_id)s, true, %(first_seen)s, %(last_seen)s, 1
             )
         """, {
             "ean":               rel["ean"],

@@ -637,7 +637,7 @@ export default function ScanResultsPage() {
           {/* Layer breakdown */}
           <div className="flex-1 w-full space-y-5">
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">Score Breakdown by Layer</h2>
+              <h2 className="text-sm font-semibold text-slate-800">Score Breakdown</h2>
               <p className="mt-0.5 text-xs text-slate-400">
                 {isRunning
                   ? "Layers complete so far — pending layers shown in gray."
@@ -646,30 +646,70 @@ export default function ScanResultsPage() {
             </div>
 
             <div className="space-y-3">
-              {LAYER_ORDER.filter((l) => l !== "enrichment" && l !== "bulk_registration").map((layer) => {
-                const hasRun = scan.layers_run.includes(layer);
-                // A layer is pending if the scan is still running AND the layer hasn't completed yet
-                const isPending = isRunning && !hasRun;
-                // If scan is complete and layer wasn't run, skip it entirely (not applicable)
-                if (!isRunning && !hasRun && scan.status === "complete") return null;
+              {isBulkScan ? (
+                /* ── Bulk registration: domain-specific breakdown ── */
+                (() => {
+                  const bulkResults = resultsByLayer["bulk_registration"] ?? [];
+                  const EAN_RULES = ["BULK_EAN_FORMAT", "BULK_EAN_DUPLICATE", "CROSS_CATALOG_EAN_CONFLICT", "CROSS_CATALOG_ISNI_CONFLICT"];
+                  const DATA_RULES = ["BULK_DATE_FORMAT", "BULK_DATE_FUTURE", "BULK_ARTIST_MISSING", "BULK_TITLE_MISSING", "BULK_IMPRINT_MISSING", "BULK_NARM_UNKNOWN", "BULK_LABEL_ABBR_INVALID", "BULK_COUNTRY_CODE_INVALID", "BULK_COUNTRY_CODE_MISSING", "BULK_ARTIST_INCONSISTENT", "BULK_TITLE_INCONSISTENT"];
+                  const CATALOG_RULES = ["CROSS_CATALOG_EAN_CONFLICT", "CROSS_CATALOG_TITLE_CONFLICT", "CROSS_CATALOG_ISNI_CONFLICT", "CROSS_CATALOG_ARTIST_VARIANT"];
+                  const ID_RULES = ["BULK_ISNI_FORMAT", "BULK_ISNI_MISSING", "BULK_ISWC_FORMAT", "BULK_ISWC_MISSING", "BULK_ISNI_INCONSISTENT", "BULK_ISNI_CONFLICTING"];
 
-                const lScore = layerScore(layer);
-                const layerCriticals = (resultsByLayer[layer] ?? []).filter(
-                  (r) => !r.resolved && (r.severity === "critical" || r.severity === "error")
-                ).length;
-                const color =
-                  lScore >= 80 ? "bg-emerald-500" : lScore >= 60 ? "bg-amber-400" : "bg-red-500";
-                return (
-                  <LayerMiniBar
-                    key={layer}
-                    label={LAYER_LABELS[layer] ?? layer}
-                    score={lScore}
-                    color={color}
-                    pending={isPending}
-                    hasIssues={layerCriticals > 0}
-                  />
-                );
-              })}
+                  function bulkCategoryScore(ruleSet: string[], countCritical = true, countWarning = true) {
+                    const subset = bulkResults.filter((r) => !r.resolved && ruleSet.includes(r.rule_id));
+                    const c = countCritical ? subset.filter((r) => r.severity === "critical" || r.severity === "error").length : 0;
+                    const w = countWarning ? subset.filter((r) => r.severity === "warning").length : 0;
+                    return Math.max(0, 100 - c * 20 - w * 7);
+                  }
+
+                  const sections = [
+                    { label: "EAN Validation",       rules: EAN_RULES,     critOnly: false },
+                    { label: "Release Data",          rules: DATA_RULES,    critOnly: false },
+                    { label: "Cross-Catalog",         rules: CATALOG_RULES, critOnly: false },
+                    { label: "Identifier Coverage",   rules: ID_RULES,      critOnly: false },
+                  ];
+
+                  return sections.map(({ label, rules, critOnly }) => {
+                    const score = bulkCategoryScore(rules, true, !critOnly);
+                    const hasCriticals = bulkResults.some(
+                      (r) => !r.resolved && rules.includes(r.rule_id) && (r.severity === "critical" || r.severity === "error")
+                    );
+                    const color = score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-amber-400" : "bg-red-500";
+                    return (
+                      <LayerMiniBar
+                        key={label}
+                        label={label}
+                        score={score}
+                        color={color}
+                        hasIssues={hasCriticals}
+                      />
+                    );
+                  });
+                })()
+              ) : (
+                /* ── Standard scan: DDEX layer breakdown ── */
+                LAYER_ORDER.filter((l) => l !== "enrichment" && l !== "bulk_registration").map((layer) => {
+                  const hasRun = scan.layers_run.includes(layer);
+                  const isPending = isRunning && !hasRun;
+                  if (!isRunning && !hasRun && scan.status === "complete") return null;
+
+                  const lScore = layerScore(layer);
+                  const layerCriticals = (resultsByLayer[layer] ?? []).filter(
+                    (r) => !r.resolved && (r.severity === "critical" || r.severity === "error")
+                  ).length;
+                  const color = lScore >= 80 ? "bg-emerald-500" : lScore >= 60 ? "bg-amber-400" : "bg-red-500";
+                  return (
+                    <LayerMiniBar
+                      key={layer}
+                      label={LAYER_LABELS[layer] ?? layer}
+                      score={lScore}
+                      color={color}
+                      pending={isPending}
+                      hasIssues={layerCriticals > 0}
+                    />
+                  );
+                })
+              )}
             </div>
 
             <div className="flex items-center gap-4 pt-2 text-xs text-slate-400">

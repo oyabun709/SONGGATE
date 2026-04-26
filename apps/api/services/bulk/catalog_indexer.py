@@ -192,6 +192,8 @@ async def check_cross_catalog_conflicts(
             FROM catalog_index
             WHERE ean = ANY(:eans)
               AND org_id = :org_id
+              AND is_demo = FALSE
+              AND scan_id IS NOT NULL
             ORDER BY ean, first_seen ASC
         """),
         {"eans": eans, "org_id": str(org_id)},
@@ -320,6 +322,8 @@ async def check_cross_catalog_conflicts(
                 FROM catalog_index
                 WHERE artist_normalized = ANY(:norms)
                   AND org_id = :org_id
+                  AND is_demo = FALSE
+                  AND scan_id IS NOT NULL
                 GROUP BY artist_normalized
                 HAVING count(DISTINCT artist) > 1
             """),
