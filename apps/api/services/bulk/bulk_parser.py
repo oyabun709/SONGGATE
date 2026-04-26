@@ -216,36 +216,21 @@ def parse_bulk_file(content: bytes) -> list[ParsedRelease]:
     return releases
 
 
-def _find_mmddyy_idx(parts: list[str]) -> int | None:
-    """
-    Return the index of the first part that looks like a valid MMDDYY date
-    (exactly 6 digits with 01≤MM≤12 and 01≤DD≤31).
-    """
-    for i, p in enumerate(parts):
-        p = p.strip()
-        if len(p) == 6 and p.isdigit():
-            mm, dd = int(p[:2]), int(p[2:4])
-            if 1 <= mm <= 12 and 1 <= dd <= 31:
-                return i
-    return None
-
-
 def extract_text_from_pdf(pdf_bytes: bytes) -> bytes:
     """
-    Extract text content from a PDF and return as pipe-delimited UTF-8 bytes.
+    Extract bulk registration rows from a PDF and return as pipe-delimited UTF-8.
 
-    Strategy:
-      1. Use pypdf layout-extraction mode to preserve column spacing.
-      2. If the extracted text already has pipe or comma delimiters (≥3 per
-         first data line), return it unchanged — the main parser handles those.
-      3. Otherwise reconstruct columns for EAN-starting rows:
-         a. Split the rest of the line on 2+ spaces to get candidate parts.
-         b. Find the MMDDYY date field (6 digits, valid MM/DD) — use it as an
-            anchor to correctly assign artist, title, and post-date columns.
-         c. Emit as pipe-delimited so the main parser reads it correctly.
+    Many Luminate/distributor bulk registration PDFs include a hidden
+    "Formula to for file" column that already contains the pipe-delimited row
+    (e.g. ``5026854832708|Taj Mahal|Time|050126|||00``).  pypdf's default
+    extraction concatenates all of these into one long string; this function
+    locates every embedded pipe row and emits them newline-separated.
+
+    Fallback: if no pipe rows are detected, use layout-extraction mode and
+    split on the MMDDYY date as a column anchor.
 
     Raises ImportError if pypdf is not installed.
-    Raises ValueError if no extractable or parseable text is found.
+    Raises ValueError if no parseable rows are found.
     """
     try:
         import pypdf  # type: ignore
@@ -256,9 +241,24 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> bytes:
         )
 
     reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+
+    # ── Strategy 1: extract embedded pipe-delimited rows ─────────────────────
+    # Pattern: EAN(13) | Artist(non-empty) | Title(non-empty) | MMDDYY
+    #          | Imprint(maybe empty) | Label(maybe empty) | NARM(2 digits)
+    # Followed by the next EAN (visual row), another pipe, or end-of-text.
+    _PIPE_ROW = re.compile(
+        r"\d{13}\|[^|]+\|[^|]+\|\d{6}(?:\|[^|]*){2}\|\d{2}(?=\d|\||\Z)"
+    )
+
+    raw_default = "".join(page.extract_text() or "" for page in reader.pages)
+    pipe_rows = _PIPE_ROW.findall(raw_default)
+
+    if pipe_rows:
+        return ("\n".join(pipe_rows)).encode("utf-8")
+
+    # ── Strategy 2: layout mode + MMDDYY date anchor ─────────────────────────
     raw_lines: list[str] = []
     for page in reader.pages:
-        # layout mode preserves horizontal column spacing as runs of spaces
         try:
             text = page.extract_text(extraction_mode="layout") or ""
         except Exception:
@@ -269,14 +269,11 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> bytes:
     if not full_text:
         raise ValueError("PDF contains no extractable text. Is this a scanned image PDF?")
 
-    # Check whether the text already contains pipe or comma delimiters
-    non_empty = [l for l in full_text.splitlines() if l.strip()]
-    if non_empty:
-        sample = non_empty[0]
-        if sample.count("|") >= 3 or sample.count(",") >= 3:
-            return full_text.encode("utf-8")
+    # If already pipe/comma delimited, return as-is
+    non_empty = [ln for ln in full_text.splitlines() if ln.strip()]
+    if non_empty and (non_empty[0].count("|") >= 3 or non_empty[0].count(",") >= 3):
+        return full_text.encode("utf-8")
 
-    # No delimiters — reconstruct columns for EAN-starting rows.
     _EAN_PREFIX = re.compile(r"^(\d{13})\s*(.*)")
     pipe_lines: list[str] = []
 
@@ -284,40 +281,28 @@ def extract_text_from_pdf(pdf_bytes: bytes) -> bytes:
         stripped = line.strip()
         if not stripped:
             continue
-
         m = _EAN_PREFIX.match(stripped)
         if not m:
-            # Header row or non-data line — pass through unchanged
             pipe_lines.append(stripped)
             continue
 
         ean  = m.group(1)
         rest = m.group(2).strip()
+        parts = [p.strip() for p in re.split(r" {2,}", rest) if p.strip()]
 
-        # Split the remainder on 2+ consecutive spaces
-        parts = re.split(r" {2,}", rest)
-        parts = [p.strip() for p in parts if p.strip()]
-
-        # Anchor on the MMDDYY date field
-        date_idx = _find_mmddyy_idx(parts)
+        # Find MMDDYY date as anchor
+        date_idx = None
+        for i, p in enumerate(parts):
+            if len(p) == 6 and p.isdigit() and 1 <= int(p[:2]) <= 12 and 1 <= int(p[2:4]) <= 31:
+                date_idx = i
+                break
 
         if date_idx is not None and date_idx >= 1:
-            pre_date  = parts[:date_idx]   # [artist, title?, ...]
-            date_val  = parts[date_idx]
-            post_date = parts[date_idx + 1:]
-
-            if len(pre_date) == 0:
-                artist, title = "", ""
-            elif len(pre_date) == 1:
-                # Artist and title couldn't be separated — put all in artist
-                artist, title = pre_date[0], ""
-            else:
-                artist = pre_date[0]
-                title  = " ".join(pre_date[1:])
-
-            row = [ean, artist, title, date_val] + post_date
+            pre   = parts[:date_idx]
+            artist = pre[0] if pre else ""
+            title  = " ".join(pre[1:]) if len(pre) > 1 else ""
+            row    = [ean, artist, title, parts[date_idx]] + parts[date_idx + 1:]
         else:
-            # No valid MMDDYY found — fall back to position-based
             row = [ean] + parts
 
         pipe_lines.append("|".join(row))
