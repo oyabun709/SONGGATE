@@ -89,16 +89,14 @@ function SeverityBadge({ severity }: { severity: string }) {
 
 function LayerMiniBar({
   label,
-  score,
-  color,
+  criticalCount = 0,
+  warningCount = 0,
   pending = false,
-  hasIssues = false,
 }: {
   label: string;
-  score: number;
-  color: string;
+  criticalCount?: number;
+  warningCount?: number;
   pending?: boolean;
-  hasIssues?: boolean;
 }) {
   if (pending) {
     return (
@@ -114,25 +112,45 @@ function LayerMiniBar({
     );
   }
 
+  // Color driven by issue PRESENCE — never by a computed score threshold.
+  // 1 critical = red. Warnings only = amber. Clean = green.
+  const hasCriticals = criticalCount > 0;
+  const hasWarnings  = warningCount  > 0;
+  const barColor = hasCriticals ? "bg-red-500" : hasWarnings ? "bg-amber-400" : "bg-emerald-500";
+  const labelColor = hasCriticals ? "text-red-600 font-medium" : hasWarnings ? "text-amber-600" : "text-slate-500";
+
+  // Bar fill: 100% when clean, shrinks proportionally with severity
+  const fill = hasCriticals
+    ? Math.max(8, 100 - criticalCount * 30 - warningCount * 5)
+    : hasWarnings
+    ? Math.max(25, 100 - warningCount * 12)
+    : 100;
+
+  // Status label — clear text, no ambiguous numbers
+  const status = hasCriticals
+    ? `${criticalCount} critical${criticalCount !== 1 ? "s" : ""}`
+    : hasWarnings
+    ? `${warningCount} warning${warningCount !== 1 ? "s" : ""}`
+    : "Pass";
+
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <span className={cn("text-xs", hasIssues ? "text-slate-600 font-medium" : "text-slate-500")}>
+        <span className={cn("text-xs", hasCriticals ? "text-slate-700 font-medium" : "text-slate-500")}>
           {label}
         </span>
         <div className="flex items-center gap-1.5">
-          {hasIssues && (
-            <AlertTriangle className="h-3 w-3 text-red-500" />
-          )}
-          <span className={cn("text-xs font-semibold tabular-nums", hasIssues ? "text-red-600" : "text-slate-700")}>
-            {score}
+          {hasCriticals && <AlertTriangle className="h-3 w-3 text-red-500" />}
+          {!hasCriticals && hasWarnings && <AlertTriangle className="h-3 w-3 text-amber-400" />}
+          <span className={cn("text-xs font-semibold tabular-nums", labelColor)}>
+            {status}
           </span>
         </div>
       </div>
       <div className="h-1.5 rounded-full bg-slate-100">
         <div
-          className={cn("h-1.5 rounded-full transition-all", color)}
-          style={{ width: `${Math.min(100, score)}%` }}
+          className={cn("h-1.5 rounded-full transition-all", barColor)}
+          style={{ width: `${fill}%` }}
         />
       </div>
     </div>
@@ -502,12 +520,13 @@ export default function ScanResultsPage() {
     (l) => l !== "enrichment" && l !== "bulk_registration" && resultsByLayer[l]?.length
   );
 
-  // Per-layer scores for mini bars (simple: 100 minus proportional deductions)
-  function layerScore(layer: string): number {
-    const layerResults = resultsByLayer[layer] ?? [];
-    const criticals = layerResults.filter((r) => !r.resolved && (r.severity === "critical" || r.severity === "error")).length;
-    const warnings = layerResults.filter((r) => !r.resolved && r.severity === "warning").length;
-    return Math.max(0, 100 - criticals * 20 - warnings * 7);
+  // Count unresolved criticals/warnings per layer for the breakdown bars
+  function layerCounts(layer: string) {
+    const rows = resultsByLayer[layer] ?? [];
+    return {
+      criticalCount: rows.filter((r) => !r.resolved && (r.severity === "critical" || r.severity === "error")).length,
+      warningCount:  rows.filter((r) => !r.resolved && r.severity === "warning").length,
+    };
   }
 
   return (
@@ -650,38 +669,32 @@ export default function ScanResultsPage() {
                 /* ── Bulk registration: domain-specific breakdown ── */
                 (() => {
                   const bulkResults = resultsByLayer["bulk_registration"] ?? [];
-                  const EAN_RULES = ["BULK_EAN_FORMAT", "BULK_EAN_DUPLICATE", "CROSS_CATALOG_EAN_CONFLICT", "CROSS_CATALOG_ISNI_CONFLICT"];
-                  const DATA_RULES = ["BULK_DATE_FORMAT", "BULK_DATE_FUTURE", "BULK_ARTIST_MISSING", "BULK_TITLE_MISSING", "BULK_IMPRINT_MISSING", "BULK_NARM_UNKNOWN", "BULK_LABEL_ABBR_INVALID", "BULK_COUNTRY_CODE_INVALID", "BULK_COUNTRY_CODE_MISSING", "BULK_ARTIST_INCONSISTENT", "BULK_TITLE_INCONSISTENT"];
+                  const EAN_RULES     = ["BULK_EAN_FORMAT", "BULK_EAN_DUPLICATE", "CROSS_CATALOG_EAN_CONFLICT", "CROSS_CATALOG_ISNI_CONFLICT"];
+                  const DATA_RULES    = ["BULK_DATE_FORMAT", "BULK_DATE_FUTURE", "BULK_ARTIST_MISSING", "BULK_TITLE_MISSING", "BULK_IMPRINT_MISSING", "BULK_NARM_UNKNOWN", "BULK_LABEL_ABBR_INVALID", "BULK_COUNTRY_CODE_INVALID", "BULK_COUNTRY_CODE_MISSING", "BULK_ARTIST_INCONSISTENT", "BULK_TITLE_INCONSISTENT"];
                   const CATALOG_RULES = ["CROSS_CATALOG_EAN_CONFLICT", "CROSS_CATALOG_TITLE_CONFLICT", "CROSS_CATALOG_ISNI_CONFLICT", "CROSS_CATALOG_ARTIST_VARIANT"];
-                  const ID_RULES = ["BULK_ISNI_FORMAT", "BULK_ISNI_MISSING", "BULK_ISWC_FORMAT", "BULK_ISWC_MISSING", "BULK_ISNI_INCONSISTENT", "BULK_ISNI_CONFLICTING"];
+                  const ID_RULES      = ["BULK_ISNI_FORMAT", "BULK_ISNI_MISSING", "BULK_ISWC_FORMAT", "BULK_ISWC_MISSING", "BULK_ISNI_INCONSISTENT", "BULK_ISNI_CONFLICTING"];
 
-                  function bulkCategoryScore(ruleSet: string[], countCritical = true, countWarning = true) {
+                  function bulkCounts(ruleSet: string[]) {
                     const subset = bulkResults.filter((r) => !r.resolved && ruleSet.includes(r.rule_id));
-                    const c = countCritical ? subset.filter((r) => r.severity === "critical" || r.severity === "error").length : 0;
-                    const w = countWarning ? subset.filter((r) => r.severity === "warning").length : 0;
-                    return Math.max(0, 100 - c * 20 - w * 7);
+                    return {
+                      criticalCount: subset.filter((r) => r.severity === "critical" || r.severity === "error").length,
+                      warningCount:  subset.filter((r) => r.severity === "warning").length,
+                    };
                   }
 
-                  const sections = [
-                    { label: "EAN Validation",       rules: EAN_RULES,     critOnly: false },
-                    { label: "Release Data",          rules: DATA_RULES,    critOnly: false },
-                    { label: "Cross-Catalog",         rules: CATALOG_RULES, critOnly: false },
-                    { label: "Identifier Coverage",   rules: ID_RULES,      critOnly: false },
-                  ];
-
-                  return sections.map(({ label, rules, critOnly }) => {
-                    const score = bulkCategoryScore(rules, true, !critOnly);
-                    const hasCriticals = bulkResults.some(
-                      (r) => !r.resolved && rules.includes(r.rule_id) && (r.severity === "critical" || r.severity === "error")
-                    );
-                    const color = score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-amber-400" : "bg-red-500";
+                  return [
+                    { label: "EAN Validation",     rules: EAN_RULES     },
+                    { label: "Release Data",        rules: DATA_RULES    },
+                    { label: "Cross-Catalog",       rules: CATALOG_RULES },
+                    { label: "Identifier Coverage", rules: ID_RULES      },
+                  ].map(({ label, rules }) => {
+                    const { criticalCount, warningCount } = bulkCounts(rules);
                     return (
                       <LayerMiniBar
                         key={label}
                         label={label}
-                        score={score}
-                        color={color}
-                        hasIssues={hasCriticals}
+                        criticalCount={criticalCount}
+                        warningCount={warningCount}
                       />
                     );
                   });
@@ -692,20 +705,14 @@ export default function ScanResultsPage() {
                   const hasRun = scan.layers_run.includes(layer);
                   const isPending = isRunning && !hasRun;
                   if (!isRunning && !hasRun && scan.status === "complete") return null;
-
-                  const lScore = layerScore(layer);
-                  const layerCriticals = (resultsByLayer[layer] ?? []).filter(
-                    (r) => !r.resolved && (r.severity === "critical" || r.severity === "error")
-                  ).length;
-                  const color = lScore >= 80 ? "bg-emerald-500" : lScore >= 60 ? "bg-amber-400" : "bg-red-500";
+                  const { criticalCount, warningCount } = layerCounts(layer);
                   return (
                     <LayerMiniBar
                       key={layer}
                       label={LAYER_LABELS[layer] ?? layer}
-                      score={lScore}
-                      color={color}
+                      criticalCount={criticalCount}
+                      warningCount={warningCount}
                       pending={isPending}
-                      hasIssues={layerCriticals > 0}
                     />
                   );
                 })
