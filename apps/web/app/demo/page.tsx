@@ -154,19 +154,23 @@ interface ISRCDemoScan {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const FORMAT_STEP_LABEL: Record<string, string> = {
-  csv:  "CSV Validation",
-  json: "JSON Validation",
-  xml:  "DDEX Validation",
-  bulk: "EAN Format Validation",
-  isrc: "ISRC Format Validation",
+  csv:   "CSV Validation",
+  json:  "JSON Validation",
+  xml:   "DDEX Validation",
+  xml43: "DDEX ERN 4.3 Validation",
+  xml42: "DDEX ERN 4.2 Validation",
+  bulk:  "EAN Format Validation",
+  isrc:  "ISRC Format Validation",
 };
 
 const FORMAT_LAYER_LABEL: Record<string, string> = {
-  csv:  "CSV / Format",
-  json: "JSON / Format",
-  xml:  "DDEX / Format",
-  bulk: "EAN Validation",
-  isrc: "ISRC Validation",
+  csv:   "CSV / Format",
+  json:  "JSON / Format",
+  xml:   "DDEX / Format",
+  xml43: "DDEX ERN 4.3 / Format",
+  xml42: "DDEX ERN 4.2 / Format",
+  bulk:  "EAN Validation",
+  isrc:  "ISRC Validation",
 };
 
 function getLayerSteps(fmt: string) {
@@ -755,7 +759,7 @@ export default function DemoPage() {
         if (!res.ok) throw new Error("Scan failed. Please try again.");
         return res.json() as Promise<DemoScan>;
       });
-    await animateLayers(promise, "xml");
+    await animateLayers(promise, "xml43");
   }
 
   // ── Scan sample bulk registration file ───────────────────────────────────
@@ -835,11 +839,15 @@ export default function DemoPage() {
 
     // Detect format from filename for the loading animation
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "xml";
-    const fmt = ext === "csv" ? "csv" : ext === "json" ? "json" : "xml";
-
-    // Read and store file content for download later
+    // Read content first so we can detect DDEX version from namespace
     const text = await file.text();
     setUploadedFile({ name: file.name, content: text });
+    let fmt = ext === "csv" ? "csv" : ext === "json" ? "json" : "xml";
+    // For XML files, detect ERN version from namespace to show correct label
+    if (fmt === "xml") {
+      if (text.includes("ern/42")) fmt = "xml42";
+      else if (text.includes("ern/43")) fmt = "xml43";
+    }
 
     const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     const fd  = new FormData();
@@ -1115,10 +1123,18 @@ export default function DemoPage() {
             <div className="mt-12 mx-auto max-w-sm">
               <p className="mb-6 text-sm font-semibold text-slate-700">
                 {scanFormat === "bulk"
-                  ? "Running your catalog through 3 QA layers…"
+                  ? "Scanning bulk registration file…"
                   : scanFormat === "isrc"
-                  ? "Running your ISRC file through 3 validation checks…"
-                  : "Running your release through 4 QA layers…"}
+                  ? "Scanning ISRC reference file…"
+                  : scanFormat === "xml43"
+                  ? "Scanning DDEX ERN 4.3 package…"
+                  : scanFormat === "xml42"
+                  ? "Scanning DDEX ERN 4.2 package…"
+                  : scanFormat === "csv"
+                  ? "Scanning CSV metadata…"
+                  : scanFormat === "json"
+                  ? "Scanning JSON package…"
+                  : "Scanning DDEX package…"}
               </p>
               <ScanProgress completedLayers={completedLayers} fmt={scanFormat} />
               <p className="mt-4 text-xs text-slate-400">

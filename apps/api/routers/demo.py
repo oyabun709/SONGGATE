@@ -880,18 +880,9 @@ def _run_isrc_scan(content: bytes, filename: str = "") -> dict[str, Any]:
     info     = sum(1 for i in issues if i.severity == "info")
     total_issues = len(issues)
 
-    # Simple readiness score: start at 100, deduct per issue
-    score = max(0, 100 - critical * 15 - warning * 5 - info * 1)
-    if score >= 90:
-        grade = "A"
-    elif score >= 75:
-        grade = "B"
-    elif score >= 60:
-        grade = "C"
-    elif score >= 40:
-        grade = "D"
-    else:
-        grade = "F"
+    # Readiness score — same formula as bulk/DDEX: cap deductions per tier
+    score = round(max(0.0, 100.0 - min(critical * 10, 60) - min(warning * 3, 25) - min(info * 0.5, 5)), 1)
+    grade = "PASS" if score >= 80 else ("WARN" if score >= 60 else "FAIL")
 
     def _fmt(i: Any) -> dict[str, Any]:
         return {

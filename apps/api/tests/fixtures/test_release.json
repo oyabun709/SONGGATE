@@ -1,0 +1,35 @@
+[
+  {
+    "release_title": "JSON Clean Album",
+    "artist_name": "JSON Test Artist",
+    "upc": "0199957600262",
+    "release_date": "2026-05-15",
+    "label_name": "JSON Test Label",
+    "isrc": "US-PR1-26-00301",
+    "track_title": "JSON Clean Track One",
+    "track_number": 1,
+    "duration": "3:52"
+  },
+  {
+    "release_title": "JSON Clean Album",
+    "artist_name": "JSON Test Artist",
+    "upc": "0199957600262",
+    "release_date": "2026-05-15",
+    "label_name": "JSON Test Label",
+    "isrc": "US-PR1-26-00302",
+    "track_title": "JSON Clean Track Two",
+    "track_number": 2,
+    "duration": "4:05"
+  },
+  {
+    "release_title": "",
+    "artist_name": "",
+    "upc": "INVALID-UPC-HERE",
+    "release_date": "not-a-date",
+    "label_name": "",
+    "isrc": "BADJSON",
+    "track_title": "Invalid Data Track",
+    "track_number": 3,
+    "duration": "0:00"
+  }
+]

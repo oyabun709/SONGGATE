@@ -1,0 +1,6 @@
+ISRC|Artist|Title|ReleaseDate|LabelAbbreviation|LabelName|CountryCode
+US-PR1-26-00101|Clean Artist|Clean Track One|041526|CLNLBL|Clean Label|US
+US-PR1-26-00102|Clean Artist|Clean Track Two|041526|CLNLBL|Clean Label|US
+US-PR1-26-00103|Clean Artist|Clean Track Three|041526|CLNLBL|Clean Label|US
+BADISRC-XXXX|Invalid Format Artist|Invalid ISRC Track|041526|BADFMT|Bad Format Label|US
+US-PR1-26-00101|Duplicate Artist|Duplicate Track|041526|DUPL|Duplicate Label|US

@@ -1,0 +1,7 @@
+EAN|Artist|Title|Release Date|Imprint|Label|NARM
+0753088935176|Bill Evans Trio|Explorations|041526||Riverside Records|00
+0820233171922|YOASOBI|E-SIDE 4|042426||Sony Music Entertainment Japan|02
+0196874342671|The Kid LAROI|BEFORE I FORGET (DELUXE)|042426||Sony Music|02
+0199584421445X|Foo Fighters|Your Favorite Toy|042426||RCA|04
+0753088935176|Bill Evans Trio Duplicate|Explorations Reissue|041526||Riverside Records|00
+0199957600262|King Gizzard and the Lizard Wizard|Big Fig Wasp|040126||Having Fun Records|00

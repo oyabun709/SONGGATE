@@ -352,7 +352,10 @@ class ScanOrchestrator:
         fmt = (release.submission_format.value or "").upper()
 
         if "DDEX" in fmt:
-            findings: list[DDEXFinding] = self.ddex_validator.validate(content)
+            # Determine the correct ERN version from the stored submission_format
+            # so ERN 4.2 files are not falsely rejected with a namespace mismatch.
+            _ern_version = "ERN42" if "42" in fmt else "ERN43"
+            findings: list[DDEXFinding] = self.ddex_validator.validate(content, version=_ern_version)
 
             # Extract metadata from the DDEX package and persist it so the
             # metadata rules engine has real values to evaluate in layer 2.

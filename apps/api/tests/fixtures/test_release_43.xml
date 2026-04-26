@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ern:NewReleaseMessage
+  xmlns:ern="http://ddex.net/xml/ern/43"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  MessageSchemaVersionId="ern/43"
+  ReleaseProfileVersionId="Common"
+  LanguageAndScriptCode="en">
+  <MessageHeader>
+    <MessageThreadId>FIXTURE-43-001</MessageThreadId>
+    <MessageId>FIXTURE-43-001-MSG</MessageId>
+    <MessageSender>
+      <PartyId>PADPIDA2024123101H</PartyId>
+      <PartyName><FullName>Test Distributor</FullName></PartyName>
+    </MessageSender>
+    <MessageRecipient>
+      <PartyId>PADPIDA2024123102H</PartyId>
+      <PartyName><FullName>Test DSP</FullName></PartyName>
+    </MessageRecipient>
+    <MessageCreatedDateTime>2026-04-26T00:00:00Z</MessageCreatedDateTime>
+    <MessageControlType>LiveMessage</MessageControlType>
+  </MessageHeader>
+
+  <ResourceList>
+    <!-- Track 1: Clean track, all fields valid -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId>
+        <ISRC>US-PR1-26-10001</ISRC>
+      </SoundRecordingId>
+      <ResourceReference>A1</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Clean Track</TitleText>
+      </ReferenceTitle>
+      <Duration>PT3M45S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>Clean Track</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyName><FullName>Test Artist</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <PLine>
+          <Year>2026</Year>
+          <PLineText>2026 Test Label Records</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>2026 Test Label Records</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Pop</GenreText>
+        </Genre>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Track 2: Malformed ISRC (missing hyphens, wrong length) — CRITICAL -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId>
+        <ISRC>BADISRC999</ISRC>
+      </SoundRecordingId>
+      <ResourceReference>A2</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Malformed ISRC Track</TitleText>
+      </ReferenceTitle>
+      <Duration>PT4M10S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>Malformed ISRC Track</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyName><FullName>Test Artist</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <PLine>
+          <Year>2026</Year>
+          <PLineText>2026 Test Label Records</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>2026 Test Label Records</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Pop</GenreText>
+        </Genre>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Track 3: Missing P-Line — CRITICAL -->
+    <SoundRecording>
+      <SoundRecordingType>MusicalWorkSoundRecording</SoundRecordingType>
+      <SoundRecordingId>
+        <ISRC>US-PR1-26-10003</ISRC>
+      </SoundRecordingId>
+      <ResourceReference>A3</ResourceReference>
+      <ReferenceTitle>
+        <TitleText>Missing P-Line Track</TitleText>
+      </ReferenceTitle>
+      <Duration>PT2M58S</Duration>
+      <SoundRecordingDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <Title TitleType="FormalTitle">
+          <TitleText>Missing P-Line Track</TitleText>
+        </Title>
+        <DisplayArtist SequenceNumber="1">
+          <PartyName><FullName>Test Artist</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <!-- No PLine element — CRITICAL -->
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>2026 Test Label Records</CLineText>
+        </CLine>
+        <Genre>
+          <GenreText>Pop</GenreText>
+        </Genre>
+      </SoundRecordingDetailsByTerritory>
+    </SoundRecording>
+
+    <!-- Artwork: valid 3000x3000 -->
+    <Image>
+      <ImageType>FrontCoverImage</ImageType>
+      <ResourceReference>A4</ResourceReference>
+      <ImageDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <TechnicalImageDetails>
+          <ImageCodecType>JPEG</ImageCodecType>
+          <ImageHeight>3000</ImageHeight>
+          <ImageWidth>3000</ImageWidth>
+          <ImageResolution>300</ImageResolution>
+          <ColorDepth>24</ColorDepth>
+        </TechnicalImageDetails>
+      </ImageDetailsByTerritory>
+    </Image>
+  </ResourceList>
+
+  <ReleaseList>
+    <Release IsMainRelease="true">
+      <ReleaseId>
+        <GRid>A10301B0000123456N</GRid>
+        <ICPN>0711574971718</ICPN>
+      </ReleaseId>
+      <ReleaseReference>R0</ReleaseReference>
+      <ReferenceTitle>
+        <TitleText>Test Release ERN 4.3</TitleText>
+      </ReferenceTitle>
+      <ReleaseResourceReferenceList>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A1</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A2</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="PrimaryResource">A3</ReleaseResourceReference>
+        <ReleaseResourceReference ReleaseResourceType="SecondaryResource">A4</ReleaseResourceReference>
+      </ReleaseResourceReferenceList>
+      <ReleaseType>Album</ReleaseType>
+      <ReleaseDetailsByTerritory>
+        <TerritoryCode>Worldwide</TerritoryCode>
+        <DisplayArtistName>Test Artist</DisplayArtistName>
+        <DisplayArtist SequenceNumber="1">
+          <PartyName><FullName>Test Artist</FullName></PartyName>
+          <ArtistRole>MainArtist</ArtistRole>
+        </DisplayArtist>
+        <LabelName>Test Label Records</LabelName>
+        <Title TitleType="FormalTitle">
+          <TitleText>Test Release ERN 4.3</TitleText>
+        </Title>
+        <Genre>
+          <GenreText>Pop</GenreText>
+        </Genre>
+        <PLine>
+          <Year>2026</Year>
+          <PLineText>2026 Test Label Records</PLineText>
+        </PLine>
+        <CLine>
+          <Year>2026</Year>
+          <CLineText>2026 Test Label Records</CLineText>
+        </CLine>
+        <OriginalReleaseDate>2026-05-01</OriginalReleaseDate>
+        <ReleaseDate>2026-05-01</ReleaseDate>
+      </ReleaseDetailsByTerritory>
+    </Release>
+  </ReleaseList>
+
+  <DealList>
+    <ReleaseDeal>
+      <DealReleaseReference>R0</DealReleaseReference>
+      <Deal>
+        <DealTerms>
+          <CommercialModelType>PayAsYouGoModel</CommercialModelType>
+          <Usage>
+            <UseType>OnDemandStream</UseType>
+          </Usage>
+          <TerritoryCode>Worldwide</TerritoryCode>
+          <ValidityPeriod>
+            <StartDate>2026-05-01</StartDate>
+          </ValidityPeriod>
+        </DealTerms>
+      </Deal>
+    </ReleaseDeal>
+  </DealList>
+</ern:NewReleaseMessage>

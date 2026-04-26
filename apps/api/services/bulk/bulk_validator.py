@@ -181,15 +181,17 @@ def validate_iswc(iswc: str) -> str | None:
 _KNOWN_NARM_CODES: dict[str, str] = {
     "00": "LP",
     "02": "CD",
+    "04": "Cassette Album",
+    "05": "EP",
+    "06": "Mini-Album",
+    "07": "MxCD Single",
     "20": "7-inch Single",
     "21": "12-inch Single",
     "22": "Cassette Single",
     "25": "CD Single",
-    "04": "Cassette Album",
     "40": "DVD Video",
     "41": "DVD Album",
     "50": "VHS Video",
-    "07": "MxCD Single",
 }
 
 
@@ -390,13 +392,13 @@ def _validate_release(release: ParsedRelease, today: date) -> list[BulkIssue]:
             ))
     else:
         issues.append(_issue(
-            severity="warning",
+            severity="info",
             rule_id="BULK_COUNTRY_CODE_MISSING",
             rule_name="Missing Country Code",
-            message="Missing country code — required for Luminate Market Share reference file submissions",
+            message="Missing country code — recommended for Luminate Market Share reference file submissions",
             fix_hint=(
                 "Add 2-letter ISO country code (e.g., US for United States). "
-                "Required for all Luminate Market Share claimants."
+                "Recommended for Luminate Market Share claimants."
             ),
             scope="per_release",
             row_number=row,

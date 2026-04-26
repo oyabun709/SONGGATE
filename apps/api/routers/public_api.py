@@ -768,6 +768,17 @@ async def upload_ddex(
         encoded = _b64.b64encode(content).decode()
         raw_package_url = f"data:application/xml;base64,{encoded}"
 
+    # ── Detect DDEX version from namespace ────────────────────────────────
+    detected_format = SubmissionFormat.DDEX_ERN_43  # default
+    try:
+        from lxml import etree as _etree
+        _root = _etree.fromstring(content)
+        _ns = _root.tag[1:].split("}")[0] if _root.tag.startswith("{") else ""
+        if "ern/42" in _ns:
+            detected_format = SubmissionFormat.DDEX_ERN_42
+    except Exception:
+        pass
+
     # ── Create release row ─────────────────────────────────────────────────
     release = Release(
         id=uuid.uuid4(),
@@ -775,7 +786,7 @@ async def upload_ddex(
         external_id=external_id,
         title=title,
         artist=artist,
-        submission_format=SubmissionFormat.DDEX_ERN_43,
+        submission_format=detected_format,
         raw_package_url=raw_package_url,
         status=ReleaseStatus.ingesting,
         created_at=datetime.now(timezone.utc),

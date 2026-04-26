@@ -35,6 +35,7 @@ const LAYER_LABELS: Record<string, string> = {
   artwork: "Artwork Validation",
   enrichment: "MusicBrainz Enrichment",
   bulk_registration: "Bulk Registration",
+  isrc_registration: "ISRC Reference",
 };
 
 const FORMAT_LABELS: Record<string, string> = {
@@ -60,6 +61,32 @@ function resolveFormatLabel(
   if (layersRun.includes("bulk_registration"))  return "Bulk Registration";
   return null;
 }
+
+/** Return the in-progress scanning message shown while scan is running. */
+function resolveScanningLabel(
+  submissionFormat: string | null | undefined,
+  layersRun: string[]
+): string {
+  const fmt = submissionFormat ?? "";
+  if (fmt === "DDEX_ERN_43") return "Scanning DDEX ERN 4.3 package…";
+  if (fmt === "DDEX_ERN_42") return "Scanning DDEX ERN 4.2 package…";
+  if (fmt === "BULK_REGISTRATION" || layersRun.includes("bulk_registration"))
+    return "Scanning bulk registration file…";
+  if (fmt === "ISRC_REGISTRATION" || layersRun.includes("isrc_registration"))
+    return "Scanning ISRC reference file…";
+  if (fmt === "CSV") return "Scanning CSV metadata…";
+  if (fmt === "JSON") return "Scanning JSON package…";
+  return "Scanning…";
+}
+
+const SCAN_LAYER_STEPS: Record<string, string[]> = {
+  DDEX_ERN_43:       ["DDEX / Format", "DSP Metadata Rules", "Fraud Screening", "Artwork Validation"],
+  DDEX_ERN_42:       ["DDEX / Format", "DSP Metadata Rules", "Fraud Screening", "Artwork Validation"],
+  CSV:               ["Format Validation", "Metadata Completeness", "Fraud Screening", "Identifier Coverage"],
+  JSON:              ["Format Validation", "Metadata Completeness", "Fraud Screening", "Identifier Coverage"],
+  BULK_REGISTRATION: ["EAN Validation", "Release Data", "Cross-Catalog", "Identifier Coverage"],
+  ISRC_REGISTRATION: ["ISRC Validation", "Release Data", "Cross-Catalog", "Identifier Coverage"],
+};
 
 const LAYER_ORDER = ["ddex", "metadata", "fraud", "artwork", "enrichment", "bulk_registration"];
 
@@ -506,6 +533,8 @@ export default function ScanResultsPage() {
   const isRunning = scan.status === "running" || scan.status === "queued";
   const enrichmentResults = scan.results.filter((r) => r.layer === "enrichment");
   const isBulkScan = scan.layers_run?.includes("bulk_registration");
+  const isIsrcScan = scan.layers_run?.includes("isrc_registration") ||
+    scan.submission_format === "ISRC_REGISTRATION" || scan.submission_format === "ISRC_REFERENCE";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bulkValidatedFields = isBulkScan ? (scan.validated_fields as any) : null;
   const identifierCoverage = bulkValidatedFields?.identifier_coverage ?? null;
@@ -551,7 +580,7 @@ export default function ScanResultsPage() {
           {isRunning && (
             <div className="flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-600">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Scanning…
+              {resolveScanningLabel(scan.submission_format, scan.layers_run ?? [])}
             </div>
           )}
           <button
@@ -584,7 +613,7 @@ export default function ScanResultsPage() {
             {jsonLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             JSON
           </button>
-          {isBulkScan ? (
+          {isBulkScan || isIsrcScan ? (
             <button
               onClick={handleDownloadBulkPdf}
               disabled={bulkPdfLoading || scan.status !== "complete"}
@@ -665,57 +694,79 @@ export default function ScanResultsPage() {
             </div>
 
             <div className="space-y-3">
-              {isBulkScan ? (
-                /* ── Bulk registration: domain-specific breakdown ── */
+              {isBulkScan || isIsrcScan ? (
+                /* ── Bulk / ISRC registration: domain-specific breakdown ── */
                 (() => {
-                  const bulkResults = resultsByLayer["bulk_registration"] ?? [];
-                  const EAN_RULES     = ["BULK_EAN_FORMAT", "BULK_EAN_DUPLICATE", "CROSS_CATALOG_EAN_CONFLICT", "CROSS_CATALOG_ISNI_CONFLICT"];
-                  const DATA_RULES    = ["BULK_DATE_FORMAT", "BULK_DATE_FUTURE", "BULK_ARTIST_MISSING", "BULK_TITLE_MISSING", "BULK_IMPRINT_MISSING", "BULK_NARM_UNKNOWN", "BULK_LABEL_ABBR_INVALID", "BULK_COUNTRY_CODE_INVALID", "BULK_COUNTRY_CODE_MISSING", "BULK_ARTIST_INCONSISTENT", "BULK_TITLE_INCONSISTENT"];
-                  const CATALOG_RULES = ["CROSS_CATALOG_EAN_CONFLICT", "CROSS_CATALOG_TITLE_CONFLICT", "CROSS_CATALOG_ISNI_CONFLICT", "CROSS_CATALOG_ARTIST_VARIANT"];
+                  const layerKey = isBulkScan ? "bulk_registration" : "isrc_registration";
+                  const layerResults = resultsByLayer[layerKey] ?? [];
+                  const EAN_RULES     = isBulkScan
+                    ? ["BULK_EAN_FORMAT", "BULK_EAN_DUPLICATE", "CROSS_CATALOG_EAN_CONFLICT"]
+                    : ["ISRC_FORMAT", "ISRC_DUPLICATE", "ISRC_MISSING_HYPHENS"];
+                  const DATA_RULES    = isBulkScan
+                    ? ["BULK_DATE_FORMAT", "BULK_DATE_FUTURE", "BULK_ARTIST_MISSING", "BULK_TITLE_MISSING", "BULK_IMPRINT_MISSING", "BULK_NARM_UNKNOWN", "BULK_LABEL_ABBR_INVALID", "BULK_COUNTRY_CODE_INVALID", "BULK_COUNTRY_CODE_MISSING", "BULK_ARTIST_INCONSISTENT", "BULK_TITLE_INCONSISTENT"]
+                    : ["ISRC_ARTIST_MISSING", "ISRC_TITLE_MISSING", "ISRC_DATE_FORMAT", "ISRC_LABEL_ABBR_INVALID", "ISRC_COUNTRY_CODE_INVALID", "ISRC_COUNTRY_CODE_MISSING"];
+                  const CATALOG_RULES = ["CROSS_CATALOG_EAN_CONFLICT", "CROSS_CATALOG_TITLE_CONFLICT", "CROSS_CATALOG_ISNI_CONFLICT", "CROSS_CATALOG_ARTIST_VARIANT", "ISRC_ARTIST_INCONSISTENT"];
                   const ID_RULES      = ["BULK_ISNI_FORMAT", "BULK_ISNI_MISSING", "BULK_ISWC_FORMAT", "BULK_ISWC_MISSING", "BULK_ISNI_INCONSISTENT", "BULK_ISNI_CONFLICTING"];
 
-                  function bulkCounts(ruleSet: string[]) {
-                    const subset = bulkResults.filter((r) => !r.resolved && ruleSet.includes(r.rule_id));
+                  function subsetCounts(ruleSet: string[]) {
+                    const subset = layerResults.filter((r) => !r.resolved && ruleSet.includes(r.rule_id));
                     return {
                       criticalCount: subset.filter((r) => r.severity === "critical" || r.severity === "error").length,
                       warningCount:  subset.filter((r) => r.severity === "warning").length,
                     };
                   }
+                  // Fallback: if no rule-based split, distribute evenly across all 4 bars
+                  const hasAnyResults = layerResults.length > 0;
+                  const allCriticals = layerResults.filter((r) => !r.resolved && (r.severity === "critical" || r.severity === "error")).length;
+                  const allWarnings  = layerResults.filter((r) => !r.resolved && r.severity === "warning").length;
+
+                  const firstLabel  = isBulkScan ? "EAN Validation"  : "ISRC Validation";
+                  const secondLabel = isBulkScan ? "Release Data"     : "Release Data";
 
                   return [
-                    { label: "EAN Validation",     rules: EAN_RULES     },
-                    { label: "Release Data",        rules: DATA_RULES    },
+                    { label: firstLabel,            rules: EAN_RULES     },
+                    { label: secondLabel,           rules: DATA_RULES    },
                     { label: "Cross-Catalog",       rules: CATALOG_RULES },
                     { label: "Identifier Coverage", rules: ID_RULES      },
                   ].map(({ label, rules }) => {
-                    const { criticalCount, warningCount } = bulkCounts(rules);
+                    const { criticalCount, warningCount } = subsetCounts(rules);
+                    // If no rule matched but there are issues, surface them on the first bar only
+                    const isFirstBar = label === firstLabel;
                     return (
                       <LayerMiniBar
                         key={label}
                         label={label}
-                        criticalCount={criticalCount}
-                        warningCount={warningCount}
+                        criticalCount={!hasAnyResults || criticalCount > 0 || !isFirstBar ? criticalCount : allCriticals}
+                        warningCount={!hasAnyResults || warningCount > 0 || !isFirstBar ? warningCount : allWarnings}
+                        pending={isRunning && layerResults.length === 0}
                       />
                     );
                   });
                 })()
               ) : (
-                /* ── Standard scan: DDEX layer breakdown ── */
-                LAYER_ORDER.filter((l) => l !== "enrichment" && l !== "bulk_registration").map((layer) => {
-                  const hasRun = scan.layers_run.includes(layer);
-                  const isPending = isRunning && !hasRun;
-                  if (!isRunning && !hasRun && scan.status === "complete") return null;
-                  const { criticalCount, warningCount } = layerCounts(layer);
-                  return (
-                    <LayerMiniBar
-                      key={layer}
-                      label={LAYER_LABELS[layer] ?? layer}
-                      criticalCount={criticalCount}
-                      warningCount={warningCount}
-                      pending={isPending}
-                    />
-                  );
-                })
+                /* ── Standard scan: DDEX / CSV / JSON layer breakdown ── */
+                (() => {
+                  // For non-DDEX formats use a generic first-layer label
+                  const fmt = scan.submission_format ?? "";
+                  const firstLayerLabel = fmt === "CSV" ? "CSV / Format"
+                    : fmt === "JSON" ? "JSON / Format"
+                    : LAYER_LABELS["ddex"];
+                  return LAYER_ORDER.filter((l) => l !== "enrichment" && l !== "bulk_registration").map((layer) => {
+                    const hasRun = scan.layers_run.includes(layer);
+                    const isPending = isRunning && !hasRun;
+                    if (!isRunning && !hasRun && scan.status === "complete") return null;
+                    const { criticalCount, warningCount } = layerCounts(layer);
+                    return (
+                      <LayerMiniBar
+                        key={layer}
+                        label={layer === "ddex" ? firstLayerLabel : (LAYER_LABELS[layer] ?? layer)}
+                        criticalCount={criticalCount}
+                        warningCount={warningCount}
+                        pending={isPending}
+                      />
+                    );
+                  });
+                })()
               )}
             </div>
 
@@ -807,6 +858,41 @@ export default function ScanResultsPage() {
           </div>
           <div className="space-y-2">
             {(resultsByLayer["bulk_registration"] ?? []).map((r) => (
+              <IssueCard
+                key={r.id}
+                result={r}
+                scanId={params.scanId}
+                token={token}
+                onResolved={handleResolved}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── ISRC REGISTRATION layer issues ───────────────────────────── */}
+      {isIsrcScan && resultsByLayer["isrc_registration"]?.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              ISRC Reference
+              {(resultsByLayer["isrc_registration"] ?? []).filter((r) => (r.severity === "critical" || r.severity === "error") && !r.resolved).length > 0 && (
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                  {(resultsByLayer["isrc_registration"] ?? []).filter((r) => (r.severity === "critical" || r.severity === "error") && !r.resolved).length} critical
+                </span>
+              )}
+              {(resultsByLayer["isrc_registration"] ?? []).filter((r) => r.severity === "warning" && !r.resolved).length > 0 && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                  {(resultsByLayer["isrc_registration"] ?? []).filter((r) => r.severity === "warning" && !r.resolved).length} warnings
+                </span>
+              )}
+            </h2>
+            <span className="text-xs text-slate-400">
+              {(resultsByLayer["isrc_registration"] ?? []).length} finding{(resultsByLayer["isrc_registration"] ?? []).length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {(resultsByLayer["isrc_registration"] ?? []).map((r) => (
               <IssueCard
                 key={r.id}
                 result={r}
