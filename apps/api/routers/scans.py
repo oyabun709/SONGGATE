@@ -770,6 +770,10 @@ async def get_scan_results(
     if not scan:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Scan not found")
 
+    # Fetch associated release to get submission_format
+    release_row = await db.get(Release, scan.release_id)
+    submission_format = (release_row.submission_format.value if release_row else None)
+
     query = select(ScanResult).where(ScanResult.scan_id == uuid.UUID(scan_id))
 
     if layer:
@@ -807,6 +811,7 @@ async def get_scan_results(
         "completed_at": scan.completed_at,
         "created_at": scan.created_at,
         "results": results,
+        "submission_format": submission_format,
     }
     return ScanDetailRead.model_validate(scan_dict)
 

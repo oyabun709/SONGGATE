@@ -37,6 +37,14 @@ const LAYER_LABELS: Record<string, string> = {
   bulk_registration: "Bulk Registration",
 };
 
+const FORMAT_LABELS: Record<string, string> = {
+  DDEX_ERN_43: "DDEX ERN 4.3",
+  DDEX_ERN_42: "DDEX ERN 4.2",
+  CSV:              "CSV Metadata",
+  JSON:             "JSON",
+  BULK_REGISTRATION: "Bulk Registration",
+};
+
 const LAYER_ORDER = ["ddex", "metadata", "fraud", "artwork", "enrichment", "bulk_registration"];
 
 const SEV_ORDER: Record<string, number> = { critical: 0, error: 0, warning: 1, info: 2 };
@@ -63,12 +71,47 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
-function LayerMiniBar({ label, score, color }: { label: string; score: number; color: string }) {
+function LayerMiniBar({
+  label,
+  score,
+  color,
+  pending = false,
+  hasIssues = false,
+}: {
+  label: string;
+  score: number;
+  color: string;
+  pending?: boolean;
+  hasIssues?: boolean;
+}) {
+  if (pending) {
+    return (
+      <div className="space-y-1 opacity-60">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-400">{label}</span>
+          <span className="text-xs text-slate-300 tabular-nums">—</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+          <div className="h-full w-1/3 rounded-full bg-slate-200 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-slate-500">{label}</span>
-        <span className="text-xs font-semibold text-slate-700 tabular-nums">{score}</span>
+        <span className={cn("text-xs", hasIssues ? "text-slate-600 font-medium" : "text-slate-500")}>
+          {label}
+        </span>
+        <div className="flex items-center gap-1.5">
+          {hasIssues && (
+            <AlertTriangle className="h-3 w-3 text-red-500" />
+          )}
+          <span className={cn("text-xs font-semibold tabular-nums", hasIssues ? "text-red-600" : "text-slate-700")}>
+            {score}
+          </span>
+        </div>
       </div>
       <div className="h-1.5 rounded-full bg-slate-100">
         <div
@@ -463,7 +506,12 @@ export default function ScanResultsPage() {
           {isRunning && (
             <div className="flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-600">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Scanning…
+              Scanning
+              {scan.submission_format && (
+                <span className="ml-0.5 rounded-full bg-indigo-100 px-1.5 py-0.5 text-indigo-700">
+                  {FORMAT_LABELS[scan.submission_format] ?? scan.submission_format}
+                </span>
+              )}
             </div>
           )}
           <button
@@ -570,13 +618,24 @@ export default function ScanResultsPage() {
             <div>
               <h2 className="text-sm font-semibold text-slate-800">Score Breakdown by Layer</h2>
               <p className="mt-0.5 text-xs text-slate-400">
-                Score reflects unresolved findings only.
+                {isRunning
+                  ? "Layers complete so far — pending layers shown in gray."
+                  : "Score reflects unresolved findings only."}
               </p>
             </div>
 
             <div className="space-y-3">
               {LAYER_ORDER.filter((l) => l !== "enrichment" && l !== "bulk_registration").map((layer) => {
+                const hasRun = scan.layers_run.includes(layer);
+                // A layer is pending if the scan is still running AND the layer hasn't completed yet
+                const isPending = isRunning && !hasRun;
+                // If scan is complete and layer wasn't run, skip it entirely (not applicable)
+                if (!isRunning && !hasRun && scan.status === "complete") return null;
+
                 const lScore = layerScore(layer);
+                const layerCriticals = (resultsByLayer[layer] ?? []).filter(
+                  (r) => !r.resolved && (r.severity === "critical" || r.severity === "error")
+                ).length;
                 const color =
                   lScore >= 80 ? "bg-emerald-500" : lScore >= 60 ? "bg-amber-400" : "bg-red-500";
                 return (
@@ -585,6 +644,8 @@ export default function ScanResultsPage() {
                     label={LAYER_LABELS[layer] ?? layer}
                     score={lScore}
                     color={color}
+                    pending={isPending}
+                    hasIssues={layerCriticals > 0}
                   />
                 );
               })}

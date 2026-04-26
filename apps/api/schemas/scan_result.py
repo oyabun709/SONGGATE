@@ -33,6 +33,7 @@ class ScanDetailRead(ScanRead):
     """Scan with its full result corpus."""
     results: list[ScanResultRead] = []
     validated_fields: list | dict = []
+    submission_format: str | None = None
 
 
 class ResolveRequest(BaseModel):

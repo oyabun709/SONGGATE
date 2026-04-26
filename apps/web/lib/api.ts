@@ -74,6 +74,7 @@ export interface ValidatedField {
 export interface ScanDetail extends Scan {
   results: ScanResult[];
   validated_fields?: ValidatedField[];
+  submission_format?: string | null;
 }
 
 export interface Release {
